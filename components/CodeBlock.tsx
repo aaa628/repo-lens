@@ -3,12 +3,6 @@
 import { Check, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 
-const LANG_MAP: Record<string, string> = {
-  docker: "dockerfile",
-  text: "text",
-  makefile: "makefile",
-};
-
 /** Client-side Shiki highlighting with real line numbers and an optional highlighted line. */
 export default function CodeBlock({
   code,
@@ -46,7 +40,7 @@ export default function CodeBlock({
         });
       let out: string;
       try {
-        out = await render(LANG_MAP[language] ?? language);
+        out = await render(language === "docker" ? "dockerfile" : language);
       } catch {
         out = await render("text");
       }

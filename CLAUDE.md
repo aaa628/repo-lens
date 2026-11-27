@@ -12,6 +12,7 @@ RepoLens: a Next.js app that takes a public GitHub repo URL and produces an inte
 npm run dev                 # dev server (http://localhost:3000)
 npm run build               # production build (also type-checks)
 npm run typecheck           # tsc --noEmit — the fastest correctness check
+npm test                    # node:test via tsx: lib/*.test.ts (URL parsing, import resolution)
 npm run ingest -- <github-url> [--prompt out.txt]
                             # run Stages 1–2 only (no LLM, no key): prints selected files + import edges,
                             # optionally writes the exact Stage 3 prompt
@@ -19,7 +20,7 @@ npm run demos -- <github-url> <slug> [--analysis demos-src/<slug>.json --model "
                             # write public/demos/<slug>.json: full pipeline (needs a key), or re-ground a stored analysis
 ```
 
-There is no test suite and no linter configured. Verify changes with `npm run typecheck`, `npm run build`, and `npm run ingest` for pipeline changes. UI changes need a browser check (the `?demo=<slug>` deep link loads a workspace without an API key).
+There is one small test file (`lib/core.test.ts`) and no linter. Verify changes with `npm test`, `npm run typecheck`, `npm run build`, and `npm run ingest` for pipeline changes. UI changes need a browser check (`/analyze?demo=<slug>` loads a workspace without an API key).
 
 Env (see `.env.example`): `LLM_PROVIDER` (`anthropic` default | `openai`), `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (default `claude-opus-5-5`), `ANTHROPIC_EFFORT` (default `medium`), `OPENAI_API_KEY`/`OPENAI_MODEL`, `GITHUB_TOKEN` (optional, raises the rate limit).
 
@@ -51,7 +52,8 @@ Most dependencies are newer than typical training data. Check `node_modules` typ
 
 ### UI (client)
 
-- `components/RepoLens.tsx`: phase state machine (landing → loading → workspace), SSE consumption, `?demo=` / `?repo=` deep links.
+- Pages: `/` (`app/page.tsx`, a server component; the only client JS is `AnalyzeForm`) and `/how-it-works` are static marketing pages sharing `SiteHeader`/`SiteFooter`/`DemoLinks` from `components/Site.tsx`. Keep them server components so the landing page doesn't ship React Flow. `next.config.ts` redirects the old `/?demo=` and `/?repo=` links to `/analyze`.
+- `app/analyze/page.tsx` reads `?repo=owner/name` or `?demo=<slug>` (unknown demo → 404, neither → redirect home) and renders `components/RepoLens.tsx`: phases loading → workspace | error, SSE consumption. Cancel and the workspace logo are plain links home; unmounting aborts the request.
 - `components/Workspace.tsx` owns all interaction state: `mode` (architecture | bugs | tour), selected node/bug, tour step. It derives `highlight` (node ids kept bright; others dimmed) and `activeNodeId` per mode. Camera moves are requested by bumping a `Focus` **nonce**; `CameraController` in `GraphCanvas` reacts to nonce changes. Compare nonces, not "first run" flags: StrictMode double-runs effects in dev.
 - `components/GraphCanvas.tsx`: dagre LR layout, custom `arch` node and `flow` edge (smooth-step paths). The **execution-trace animation** comes from `schedule()` (BFS levels from entry nodes → per-edge delay and per-node ignite time; timing constants `STEP`/`DRAW`). It is driven by CSS keyframes in `globals.css` (`edge-trace` via `pathLength=1` dashoffset, `node-ignite`, `tile-ignite`) plus SMIL sparks started with `beginElementAt`. Replays work by bumping `run`, which is used as a React `key` so animated elements remount. Respects `prefers-reduced-motion`.
 - `components/Inspector.tsx`: the three right-panel modes. `CodeBlock.tsx` lazy-loads Shiki on the client, with real line numbers via a CSS counter (`--start`) and a highlighted line.

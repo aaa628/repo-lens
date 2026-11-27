@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
+    "test": "tsx --test lib/*.test.ts",
     "ingest": "tsx scripts/ingest.ts",
     "demos": "tsx scripts/generate-demos.ts"
   },

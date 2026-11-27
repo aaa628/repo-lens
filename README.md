@@ -18,6 +18,17 @@ npm run dev                  # http://localhost:3000
 
 The three **Instant Demo** pills work with no API key.
 
+### Pages
+
+| Path | What it is |
+|---|---|
+| `/` | Landing page: analyze form, demos, product overview (static; ships no graph code) |
+| `/how-it-works` | The pipeline, how to read results, limits, what data goes where |
+| `/analyze?repo=owner/name` | Runs a live analysis, then opens the workspace |
+| `/analyze?demo=<slug>` | Opens a precomputed demo |
+
+Old links (`/?demo=…`, `/?repo=…`) redirect to `/analyze`.
+
 ### Environment
 
 | Variable | Default | Purpose |
@@ -28,6 +39,7 @@ The three **Instant Demo** pills work with no API key.
 | `ANTHROPIC_EFFORT` | `medium` | `low` … `max`; higher effort is slower but more thorough |
 | `OPENAI_API_KEY` / `OPENAI_MODEL` | – / `gpt-5` | Used when `LLM_PROVIDER=openai` |
 | `GITHUB_TOKEN` | – | Raises the GitHub limit from 60 to 5,000 req/h. Each analysis makes 2 API calls (raw file downloads don't count against it). |
+| `URL` | – | Public site URL for the social preview image. Netlify sets it; Vercel needs nothing. |
 
 ## How the pipeline works (`POST /api/analyze`, streamed as SSE)
 
@@ -41,8 +53,8 @@ Ground   lib/analyzer.ts  drop unknown paths, mark import-verified edges, add mi
 
 - **File selection** scores manifests, READMEs, entry points, API routes, data-layer files and core `src/` code. It then makes two passes: first the best file from each area of the codebase (`lib/`, `prisma/`, `app/api`, …), then the remaining budget by score. Per-directory and per-area caps keep one big folder (or `examples/`) from crowding out the data layer.
 - **Structured output**: Anthropic uses `client.beta.messages.stream` with `betaZodOutputFormat(LlmAnalysisSchema)`, so the response is validated against the schema in `lib/types.ts`. Server-side refusal fallbacks are on (`fallbacks: "default"`). OpenAI uses `responses.parse` with `zodTextFormat`. Optional fields are `.nullable()` so one schema satisfies both providers' strict modes.
-- **Grounding** is shown in the UI. Import-verified edges are drawn in violet with a ✓ in the inspector; inferred runtime edges are drawn in gray. Every bug's code context comes from the fetched file, not from the model. Findings that cite files outside the repo are dropped.
-- An in-memory cache returns repeat analyses of the same repo (per server instance, 1 h) instantly.
+- **Grounding** is shown in the UI. Import-verified edges are drawn in red with a ✓ in the inspector; inferred runtime edges are drawn in white. Every bug's code context comes from the fetched file, not from the model. Findings that cite files outside the repo are dropped.
+- An in-memory cache returns repeat analyses of the same repo (per server instance, 1 h, at most 200 repos) instantly.
 
 ## Instant demos
 
@@ -63,12 +75,16 @@ Works on Vercel or Netlify as a standard Next.js app. `/api/analyze` sets `maxDu
 ## Project layout
 
 ```
+app/page.tsx               landing page (server component; only AnalyzeForm is client JS)
+app/how-it-works/          docs page
+app/analyze/page.tsx       reads ?repo= / ?demo= and renders the RepoLens client app
 app/api/analyze/route.ts   SSE endpoint (progress → result | error)
 lib/github.ts              Stage 1: ingestion, pruning, scoring
 lib/parser.ts              Stage 2: static import graph
 lib/analyzer.ts            Stage 3 prompt + grounding + full pipeline
 lib/llm/                   provider adapters (anthropic.ts, openai.ts)
 lib/export.ts              Markdown report + Mermaid diagram export
-components/                Landing, Workspace, GraphCanvas (React Flow + dagre), Inspector, CodeBlock (Shiki)
+components/                Site (header, footer, demo links), AnalyzeForm, RepoLens (loading/error/workspace),
+                           Workspace, GraphCanvas (React Flow + dagre), Inspector, CodeBlock (Shiki)
 scripts/                   ingest.ts, generate-demos.ts
 ```
