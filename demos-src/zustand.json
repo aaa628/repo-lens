@@ -1,0 +1,230 @@
+{
+  "summary": "Zustand is a small, hook-based state management library. A framework-agnostic store core (createStore in src/vanilla.ts) holds state, a listener set and setState/getState/subscribe; thin React bindings expose it as a hook through useSyncExternalStore. Everything else (persist, devtools, redux, immer, combine) is optional middleware that wraps the store's set/get/api and is shipped as separate entry points via the rollup build.",
+  "techStack": ["TypeScript", "React", "use-sync-external-store", "Immer (optional)", "Redux DevTools", "Rollup", "Vitest", "pnpm"],
+  "nodes": [
+    {
+      "id": "vanilla-core",
+      "label": "Vanilla Store Core",
+      "layer": "logic",
+      "summary": "createStore / createStoreImpl: holds the state value and a Set of listeners, merges partial updates with Object.assign, skips no-op updates via Object.is, and notifies subscribers. Also defines the StateCreator and StoreMutators types every middleware plugs into.",
+      "files": ["src/vanilla.ts"],
+      "keySnippet": {
+        "file": "src/vanilla.ts",
+        "code": "  const setState: StoreApi<TState>['setState'] = (partial, replace) => {\n    // TODO: Remove type assertion once https://github.com/microsoft/TypeScript/issues/37663 is resolved\n    // https://github.com/microsoft/TypeScript/issues/37663#issuecomment-759728342\n    const nextState =\n      typeof partial === 'function'\n        ? (partial as (state: TState) => TState)(state)\n        : partial\n    if (!Object.is(nextState, state)) {\n      const previousState = state\n      state =\n        (replace ?? (typeof nextState !== 'object' || nextState === null))\n          ? (nextState as TState)\n          : Object.assign({}, state, nextState)\n      listeners.forEach((listener) => listener(state, previousState))\n    }\n  }",
+        "language": "typescript"
+      }
+    },
+    {
+      "id": "react-bindings",
+      "label": "React Hooks (create / useStore)",
+      "layer": "frontend",
+      "summary": "The default entry (src/index.ts) re-exports the core plus React bindings. create() builds a vanilla store and returns a hook with the store API attached; useStore subscribes through React.useSyncExternalStore with an optional selector.",
+      "files": ["src/react.ts", "src/index.ts"],
+      "keySnippet": {
+        "file": "src/react.ts",
+        "code": "  const slice = React.useSyncExternalStore(\n    api.subscribe,\n    React.useCallback(() => selector(api.getState()), [api, selector]),\n    () => selector(api.getInitialState()),\n  )\n  React.useDebugValue(slice)\n  return slice",
+        "language": "typescript"
+      }
+    },
+    {
+      "id": "traditional-api",
+      "label": "Equality-Fn Hooks (traditional)",
+      "layer": "frontend",
+      "summary": "zustand/traditional: createWithEqualityFn and useStoreWithEqualityFn, built on use-sync-external-store's with-selector shim so callers can pass a custom equality function (the pre-v5 API shape).",
+      "files": ["src/traditional.ts"],
+      "keySnippet": {
+        "file": "src/traditional.ts",
+        "code": "  const slice = useSyncExternalStoreWithSelector(\n    api.subscribe,\n    api.getState,\n    api.getInitialState,\n    selector,\n    equalityFn,\n  )",
+        "language": "typescript"
+      }
+    },
+    {
+      "id": "middleware-entry",
+      "label": "Middleware Entry Point",
+      "layer": "api",
+      "summary": "zustand/middleware: the public barrel that exposes redux, devtools, subscribeWithSelector, combine, persist and the experimental unstable_ssrSafe. Each middleware is a higher-order StateCreator.",
+      "files": ["src/middleware.ts"],
+      "keySnippet": {
+        "file": "src/middleware.ts",
+        "code": "export { redux } from './middleware/redux.ts'\nexport {\n  devtools,\n  type DevtoolsOptions,\n  type NamedSet,\n} from './middleware/devtools.ts'\nexport { subscribeWithSelector } from './middleware/subscribeWithSelector.ts'\nexport { combine } from './middleware/combine.ts'",
+        "language": "typescript"
+      }
+    },
+    {
+      "id": "persist",
+      "label": "Persist Middleware",
+      "layer": "data",
+      "summary": "Writes a partialized snapshot to a pluggable storage (localStorage by default via createJSONStorage) on every set, and hydrates on creation with versioning, migrate/merge hooks and a hydrationVersion counter that discards stale concurrent rehydrations.",
+      "files": ["src/middleware/persist.ts"],
+      "keySnippet": {
+        "file": "src/middleware/persist.ts",
+        "code": "  const setItem = () => {\n    const state = options.partialize({ ...get() })\n    return (storage as PersistStorage<S, unknown>).setItem(options.name, {\n      state,\n      version: options.version,\n    })\n  }",
+        "language": "typescript"
+      }
+    },
+    {
+      "id": "devtools-redux",
+      "label": "DevTools & Redux",
+      "layer": "logic",
+      "summary": "devtools connects a store to the Redux DevTools extension (named actions, time travel); redux adds a reducer + dispatch API on top of set, tagging each update with its action so DevTools can display it.",
+      "files": ["src/middleware/devtools.ts", "src/middleware/redux.ts"],
+      "keySnippet": {
+        "file": "src/middleware/redux.ts",
+        "code": "const reduxImpl: ReduxImpl = (reducer, initial) => (set, _get, api) => {\n  type S = typeof initial\n  type A = Parameters<typeof reducer>[1]\n  ;(api as any).dispatch = (action: A) => {\n    ;(set as NamedSet<S>)((state: S) => reducer(state, action), false, action)\n    return action\n  }",
+        "language": "typescript"
+      }
+    },
+    {
+      "id": "composition-middleware",
+      "label": "Composition Middleware",
+      "layer": "logic",
+      "summary": "Small wrappers that change how state is created or updated: combine (merge initial state with actions), immer (draft-based updates), subscribeWithSelector (selector-level subscriptions) and the experimental ssrSafe guard.",
+      "files": ["src/middleware/combine.ts", "src/middleware/immer.ts", "src/middleware/subscribeWithSelector.ts", "src/middleware/ssrSafe.ts"],
+      "keySnippet": {
+        "file": "src/middleware/combine.ts",
+        "code": "export function combine<\n  T extends object,\n  U extends object,\n  Mps extends [StoreMutatorIdentifier, unknown][] = [],\n  Mcs extends [StoreMutatorIdentifier, unknown][] = [],\n>(\n  initialState: T,\n  create: StateCreator<T, Mps, Mcs, U>,\n): StateCreator<Write<T, U>, Mps, Mcs> {\n  return (...args) => Object.assign({}, initialState, (create as any)(...args))\n}",
+        "language": "typescript"
+      }
+    },
+    {
+      "id": "shallow",
+      "label": "Shallow Equality",
+      "layer": "logic",
+      "summary": "shallow() compares objects, arrays, Maps and Sets one level deep; useShallow wraps a selector so it returns the previous reference when the new result is shallow-equal, which keeps multi-field selectors stable.",
+      "files": ["src/vanilla/shallow.ts", "src/react/shallow.ts", "src/shallow.ts"],
+      "keySnippet": {
+        "file": "src/react/shallow.ts",
+        "code": "export function useShallow<S, U>(selector: (state: S) => U): (state: S) => U {\n  const prev = React.useRef<U>(undefined)\n  return (state) => {\n    const next = selector(state)\n    return shallow(prev.current, next)\n      ? (prev.current as U)\n      : (prev.current = next)\n  }\n}",
+        "language": "typescript"
+      }
+    },
+    {
+      "id": "build-config",
+      "label": "Build & Tooling",
+      "layer": "config",
+      "summary": "package.json declares one export per entry point (vanilla, react, middleware, shallow, traditional…) and rollup.config.mjs builds each as CJS + ESM. Vitest, ESLint and tsconfig cover tests and type-checking.",
+      "files": ["package.json", "rollup.config.mjs", "tsconfig.json", "vitest.config.mts", "eslint.config.mjs"],
+      "keySnippet": {
+        "file": "package.json",
+        "code": "    \"build:base\": \"rollup -c\",\n    \"build:vanilla\": \"rollup -c --config-vanilla\",\n    \"build:react\": \"rollup -c --config-react\",\n    \"build:middleware\": \"rollup -c --config-middleware\",\n    \"build:middleware:immer\": \"rollup -c --config-middleware_immer\",\n    \"build:shallow\": \"rollup -c --config-shallow\",",
+        "language": "json"
+      }
+    },
+    {
+      "id": "docs-examples",
+      "label": "Docs & Examples",
+      "layer": "frontend",
+      "summary": "README recipes, the docs site content and two example apps (a Vite demo and a starter) that consume the library as a normal dependency.",
+      "files": ["README.md", "docs", "examples"],
+      "keySnippet": null
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "react-bindings", "target": "vanilla-core", "label": "createStore()", "animated": false },
+    { "id": "e2", "source": "traditional-api", "target": "vanilla-core", "label": "createStore()", "animated": false },
+    { "id": "e3", "source": "middleware-entry", "target": "persist", "label": "re-exports", "animated": false },
+    { "id": "e4", "source": "middleware-entry", "target": "devtools-redux", "label": "re-exports", "animated": false },
+    { "id": "e5", "source": "middleware-entry", "target": "composition-middleware", "label": "re-exports", "animated": false },
+    { "id": "e6", "source": "persist", "target": "vanilla-core", "label": "wraps setState", "animated": true },
+    { "id": "e7", "source": "devtools-redux", "target": "vanilla-core", "label": "wraps set / api", "animated": true },
+    { "id": "e8", "source": "composition-middleware", "target": "vanilla-core", "label": "StateCreator types", "animated": false },
+    { "id": "e10", "source": "docs-examples", "target": "react-bindings", "label": "import { create }", "animated": true },
+    { "id": "e11", "source": "build-config", "target": "middleware-entry", "label": "builds entry points", "animated": false }
+  ],
+  "bugs": [
+    {
+      "id": "selector-new-reference-loop",
+      "nodeId": "react-bindings",
+      "severity": "medium",
+      "title": "Selectors that return new objects can loop forever",
+      "file": "src/react.ts",
+      "lineHint": "30-34",
+      "description": "useStore hands `() => selector(api.getState())` to React.useSyncExternalStore as getSnapshot. A selector that builds a fresh object or array on every call (e.g. `s => ({ a: s.a, b: s.b })`) returns a value that is never Object.is-equal to the previous snapshot, so React re-renders until it throws \"Maximum update depth exceeded\". The README recommends useShallow, but nothing at runtime tells the developer which selector caused the loop.",
+      "suggestedFix": "In development builds, call the selector twice on the same state inside getSnapshot and console.warn when the two results differ by Object.is but are shallow-equal, pointing to useShallow from zustand/react/shallow. Production behavior stays unchanged."
+    },
+    {
+      "id": "corrupt-storage-never-hydrates",
+      "nodeId": "persist",
+      "severity": "medium",
+      "title": "Corrupt persisted JSON leaves the store permanently un-hydrated",
+      "file": "src/middleware/persist.ts",
+      "lineHint": "48",
+      "description": "createJSONStorage's getItem calls JSON.parse with no guard. If the stored string is truncated or hand-edited, parse throws; toThenable turns that into a rejection that the final handler (lines 319-325) passes to onRehydrateStorage's callback. But hasHydrated is never set to true (line 314 is skipped), onFinishHydration listeners never fire, and the corrupt entry stays in storage, so every reload fails the same way. UIs that wait on persist.hasHydrated() stay blocked.",
+      "suggestedFix": "Wrap the parse in try/catch inside getItem (lines 44-49): on failure, console.warn, call storage.removeItem(name) and return null so hydration finishes with the initial state. Add a test that seeds localStorage with '{\"state\":' and asserts hasHydrated() becomes true."
+    },
+    {
+      "id": "version-mismatch-drops-state",
+      "nodeId": "persist",
+      "severity": "low",
+      "title": "Version bump without migrate silently resets persisted state",
+      "file": "src/middleware/persist.ts",
+      "lineHint": "262-278",
+      "description": "When the stored version differs from options.version and no migrate function is configured, the code only logs console.error and falls through to `return [false, undefined]` (line 283). The store merges `undefined` into the defaults, so users lose their persisted data. Because `migrated` is false, the stale entry is not rewritten until the next set().",
+      "suggestedFix": "Rewrite storage right after the reset (treat this branch like a migration and call setItem()), and document on the `version` option that bumping it without `migrate` discards existing data."
+    },
+    {
+      "id": "persist-sync-write-per-set",
+      "nodeId": "persist",
+      "severity": "low",
+      "title": "Every state update synchronously re-serializes persisted state",
+      "file": "src/middleware/persist.ts",
+      "lineHint": "210-229",
+      "description": "Both the wrapped `set` passed to the config (lines 226-229) and the api.setState override (lines 220-223) call setItem(), which runs partialize, JSON.stringify and a synchronous localStorage.setItem on every update. High-frequency updates (dragging, typing, animation state) stall the main thread on storage I/O.",
+      "suggestedFix": "Add an opt-in write throttle (for example a `writeDelay` option that coalesces writes with setTimeout or requestIdleCallback), or document a debounced StateStorage wrapper in the persist docs."
+    },
+    {
+      "id": "listener-set-live-iteration",
+      "nodeId": "vanilla-core",
+      "severity": "low",
+      "title": "Listeners added during a notification receive the same update",
+      "file": "src/vanilla.ts",
+      "lineHint": "79",
+      "description": "setState notifies via `listeners.forEach(...)` over the live Set. Set iteration visits entries added during the loop, so a listener that subscribes another listener (for example, one that mounts a component synchronously) causes the new listener to receive the in-flight (state, prevState) pair it never observed as 'previous'. Notification order is therefore re-entrancy dependent.",
+      "suggestedFix": "Document the semantics, or iterate over a snapshot (`for (const l of Array.from(listeners)) l(state, previousState)`) and benchmark the extra allocation against the store's hot path."
+    }
+  ],
+  "walkthrough": [
+    {
+      "step": 1,
+      "nodeId": "docs-examples",
+      "title": "Start here: the two-minute mental model",
+      "explanation": "Read the README's 'First create a store' and 'Then bind your components' sections. They show the whole public surface: create() returns a hook, and you select slices with it. Everything in the codebase exists to support that pattern.",
+      "whatToReadFirst": "README.md (sections 'First create a store' → 'Selecting multiple state slices')"
+    },
+    {
+      "step": 2,
+      "nodeId": "react-bindings",
+      "title": "Entry point: how create() becomes a hook",
+      "explanation": "src/index.ts re-exports vanilla + react. In src/react.ts, createImpl builds a vanilla store and attaches its API to a hook; useStore is a thin wrapper around React.useSyncExternalStore.",
+      "whatToReadFirst": "src/react.ts (createImpl, useStore)"
+    },
+    {
+      "step": 3,
+      "nodeId": "vanilla-core",
+      "title": "Core logic: ~40 lines that are the whole store",
+      "explanation": "createStoreImpl is the heart of the library: setState resolves functional updates, bails out with Object.is, shallow-merges unless `replace` is set, and fans out to listeners. Understand this and every middleware becomes readable.",
+      "whatToReadFirst": "src/vanilla.ts (createStoreImpl)"
+    },
+    {
+      "step": 4,
+      "nodeId": "composition-middleware",
+      "title": "Middleware pattern: wrapping set, get and api",
+      "explanation": "Every middleware is a function from StateCreator to StateCreator. combine.ts is the smallest example (one line); then skim redux.ts to see one that adds methods to the api object.",
+      "whatToReadFirst": "src/middleware/combine.ts"
+    },
+    {
+      "step": 5,
+      "nodeId": "persist",
+      "title": "Data layer: persistence and hydration",
+      "explanation": "persist wraps setState to write through to storage and runs hydrate() on creation: read → optional migrate → merge → set(state, true). The hydrationVersion counter discards results from superseded rehydrate() calls.",
+      "whatToReadFirst": "src/middleware/persist.ts (persistImpl → hydrate)"
+    },
+    {
+      "step": 6,
+      "nodeId": "persist",
+      "title": "Good first contribution: harden JSON hydration",
+      "explanation": "Make createJSONStorage tolerate corrupt stored JSON: catch the JSON.parse error, clear the bad entry and return null so hydration completes. It's a small, well-scoped change with an obvious test, and it fixes a real hang for apps gating on hasHydrated().",
+      "whatToReadFirst": "src/middleware/persist.ts:44-49 (createJSONStorage → getItem → parse)"
+    }
+  ]
+}

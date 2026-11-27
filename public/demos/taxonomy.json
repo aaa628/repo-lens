@@ -1,0 +1,604 @@
+{
+ "repoMeta": {
+  "owner": "shadcn-ui",
+  "name": "taxonomy",
+  "description": "An open source application built using the new router, server components and everything new in Next.js 13.",
+  "stars": 19291,
+  "primaryLanguage": "TypeScript",
+  "techStack": [
+   "Next.js 13 (App Router)",
+   "React 18",
+   "TypeScript",
+   "Prisma",
+   "MySQL",
+   "NextAuth.js",
+   "Stripe",
+   "Postmark",
+   "Contentlayer (MDX)",
+   "Editor.js",
+   "Tailwind CSS",
+   "Radix UI"
+  ],
+  "htmlUrl": "https://github.com/shadcn-ui/taxonomy",
+  "defaultBranch": "main"
+ },
+ "summary": "Taxonomy is a full-stack Next.js 13 App Router demo: a marketing site, blog and docs built from MDX with Contentlayer, plus an authenticated dashboard where users write posts in Editor.js. NextAuth (GitHub + Postmark magic links, JWT sessions) handles auth, Prisma on MySQL stores users and posts, and Stripe Checkout, the billing portal and webhooks gate a Pro plan that lifts the 3-post limit.",
+ "nodes": [
+  {
+   "id": "marketing-site",
+   "label": "Marketing, Blog & Docs",
+   "layer": "frontend",
+   "summary": "The root layout (fonts, theme, metadata) and the public route groups: (marketing) landing, pricing and blog pages, and (docs) documentation and guides rendered from Contentlayer MDX.",
+   "files": [
+    "app/layout.tsx",
+    "app/(marketing)",
+    "app/(docs)"
+   ],
+   "fileCount": 13,
+   "keySnippet": {
+    "file": "app/layout.tsx",
+    "code": "export const metadata = {\n  title: {\n    default: siteConfig.name,\n    template: `%s | ${siteConfig.name}`,\n  },\n  description: siteConfig.description,",
+    "language": "tsx",
+    "startLine": 27
+   }
+  },
+  {
+   "id": "dashboard-ui",
+   "label": "Dashboard & Editor",
+   "layer": "frontend",
+   "summary": "Authenticated server components under (dashboard) and (editor): the post list, billing and settings pages, and the Editor.js editor page, which loads a post only if the current user is its author.",
+   "files": [
+    "app/(dashboard)",
+    "app/(editor)"
+   ],
+   "fileCount": 11,
+   "keySnippet": {
+    "file": "app/(dashboard)/dashboard/page.tsx",
+    "code": "  const posts = await db.post.findMany({\n    where: {\n      authorId: user.id,\n    },\n    select: {\n      id: true,\n      title: true,\n      published: true,\n      createdAt: true,\n    },\n    orderBy: {\n      updatedAt: \"desc\",\n    },\n  })",
+    "language": "tsx",
+    "startLine": 23
+   }
+  },
+  {
+   "id": "ui-components",
+   "label": "UI Components",
+   "layer": "frontend",
+   "summary": "Shared React components used by every route group: Radix-based primitives in components/ui, navigation, the post editor and item rows, the billing form, the user auth form and MDX renderers.",
+   "files": [
+    "components"
+   ],
+   "fileCount": 67
+  },
+  {
+   "id": "auth-pages",
+   "label": "Login & Register Pages",
+   "layer": "frontend",
+   "summary": "The (auth) route group with the login and register screens. They host the user auth form that starts the GitHub OAuth or email magic-link flow.",
+   "files": [
+    "app/(auth)"
+   ],
+   "fileCount": 3
+  },
+  {
+   "id": "auth",
+   "label": "Auth (NextAuth + Middleware)",
+   "layer": "api",
+   "summary": "authOptions configures NextAuth with the Prisma adapter, a GitHub provider, a Postmark-backed email provider and JWT sessions whose callback reloads the user from the DB. middleware.ts redirects unauthenticated visitors away from /dashboard and /editor.",
+   "files": [
+    "lib/auth.ts",
+    "lib/session.ts",
+    "pages/api/auth/[...nextauth].ts",
+    "app/api/auth",
+    "middleware.ts"
+   ],
+   "fileCount": 5,
+   "keySnippet": {
+    "file": "middleware.ts",
+    "code": "    if (!isAuth) {\n      let from = req.nextUrl.pathname;\n      if (req.nextUrl.search) {\n        from += req.nextUrl.search;\n      }\n\n      return NextResponse.redirect(\n        new URL(`/login?from=${encodeURIComponent(from)}`, req.url)\n      );\n    }",
+    "language": "typescript",
+    "startLine": 21
+   }
+  },
+  {
+   "id": "posts-api",
+   "label": "Posts API",
+   "layer": "api",
+   "summary": "Route handlers for listing and creating posts (enforcing the free-plan limit of 3) and for updating or deleting a single post after an ownership check. Bodies are validated with zod schemas from lib/validations.",
+   "files": [
+    "app/api/posts"
+   ],
+   "fileCount": 2,
+   "keySnippet": {
+    "file": "app/api/posts/route.ts",
+    "code": "    if (!subscriptionPlan?.isPro) {\n      const count = await db.post.count({\n        where: {\n          authorId: user.id,\n        },\n      })\n\n      if (count >= 3) {\n        throw new RequiresProPlanError()\n      }\n    }",
+    "language": "typescript",
+    "startLine": 54
+   }
+  },
+  {
+   "id": "users-billing-api",
+   "label": "User & Billing API",
+   "layer": "api",
+   "summary": "PATCH /api/users/[userId] updates the display name, and GET /api/users/stripe returns either a Stripe billing-portal URL (Pro users) or a Checkout URL that carries the userId in metadata.",
+   "files": [
+    "app/api/users"
+   ],
+   "fileCount": 2,
+   "keySnippet": {
+    "file": "app/api/users/stripe/route.ts",
+    "code": "    const stripeSession = await stripe.checkout.sessions.create({\n      success_url: billingUrl,\n      cancel_url: billingUrl,\n      payment_method_types: [\"card\"],\n      mode: \"subscription\",\n      billing_address_collection: \"auto\",\n      customer_email: session.user.email,",
+    "language": "typescript",
+    "startLine": 35
+   }
+  },
+  {
+   "id": "stripe-webhook",
+   "label": "Stripe Webhook",
+   "layer": "api",
+   "summary": "Verifies the Stripe signature, then on checkout.session.completed links the subscription to the user, and on invoice.payment_succeeded extends stripeCurrentPeriodEnd.",
+   "files": [
+    "app/api/webhooks"
+   ],
+   "fileCount": 1,
+   "keySnippet": {
+    "file": "app/api/webhooks/stripe/route.ts",
+    "code": "  try {\n    event = stripe.webhooks.constructEvent(\n      body,\n      signature,\n      env.STRIPE_WEBHOOK_SECRET\n    )\n  } catch (error) {\n    return new Response(`Webhook Error: ${error.message}`, { status: 400 })\n  }",
+    "language": "typescript",
+    "startLine": 14
+   }
+  },
+  {
+   "id": "og-image",
+   "label": "OG Image API",
+   "layer": "api",
+   "summary": "Edge route that renders Open Graph images with @vercel/og from validated heading/type/mode query parameters, using bundled fonts.",
+   "files": [
+    "app/api/og",
+    "lib/validations/og.ts"
+   ],
+   "fileCount": 2,
+   "keySnippet": {
+    "file": "app/api/og/route.tsx",
+    "code": "    const url = new URL(req.url)\n    const values = ogImageSchema.parse(Object.fromEntries(url.searchParams))\n    const heading =\n      values.heading.length > 140\n        ? `${values.heading.substring(0, 140)}...`\n        : values.heading",
+    "language": "tsx",
+    "startLine": 20
+   }
+  },
+  {
+   "id": "subscriptions",
+   "label": "Subscriptions & Stripe Client",
+   "layer": "logic",
+   "summary": "getUserSubscriptionPlan derives isPro from the stored Stripe price and period end (with a 1-day grace period) and merges in the free/pro plan definitions. lib/stripe.ts holds the configured Stripe SDK client.",
+   "files": [
+    "lib/subscription.ts",
+    "lib/stripe.ts",
+    "config/subscriptions.ts"
+   ],
+   "fileCount": 3,
+   "keySnippet": {
+    "file": "lib/subscription.ts",
+    "code": "  // Check if user is on a pro plan.\n  const isPro =\n    user.stripePriceId &&\n    user.stripeCurrentPeriodEnd?.getTime() + 86_400_000 > Date.now()\n\n  const plan = isPro ? proPlan : freePlan",
+    "language": "typescript",
+    "startLine": 26
+   }
+  },
+  {
+   "id": "data",
+   "label": "Prisma / MySQL",
+   "layer": "data",
+   "summary": "schema.prisma defines NextAuth's Account/Session/User/VerificationToken models, Stripe billing columns on User, and Post with Editor.js JSON content. lib/db.ts exports a PrismaClient singleton that is cached on globalThis in development to survive hot reloads.",
+   "files": [
+    "prisma/schema.prisma",
+    "lib/db.ts"
+   ],
+   "fileCount": 2,
+   "keySnippet": {
+    "file": "prisma/schema.prisma",
+    "code": "model Post {\n  id        String   @id @default(cuid())\n  title     String\n  content   Json?\n  published Boolean  @default(false)\n  createdAt DateTime @default(now()) @map(name: \"created_at\")\n  updatedAt DateTime @default(now()) @map(name: \"updated_at\")\n  authorId  String\n\n  author User @relation(fields: [authorId], references: [id])",
+    "language": "prisma",
+    "startLine": 75
+   }
+  },
+  {
+   "id": "shared-lib",
+   "label": "Shared Utilities & Validation",
+   "layer": "logic",
+   "summary": "cn() class merging, date formatting, absoluteUrl from NEXT_PUBLIC_APP_URL, the MDX table-of-contents builder, custom errors and the zod schemas for auth, posts and users.",
+   "files": [
+    "lib/utils.ts",
+    "lib/toc.ts",
+    "lib/exceptions.ts",
+    "lib/validations"
+   ],
+   "fileCount": 6,
+   "keySnippet": {
+    "file": "lib/utils.ts",
+    "code": "export function absoluteUrl(path: string) {\n  return `${env.NEXT_PUBLIC_APP_URL}${path}`\n}",
+    "language": "typescript",
+    "startLine": 19
+   }
+  },
+  {
+   "id": "config",
+   "label": "Config & Environment",
+   "layer": "config",
+   "summary": "Typed env validation (env.mjs), site/docs/dashboard/marketing navigation config, Next.js with Contentlayer, Tailwind, and package.json scripts.",
+   "files": [
+    "package.json",
+    "env.mjs",
+    "next.config.mjs",
+    "tailwind.config.js",
+    "config"
+   ],
+   "fileCount": 8
+  }
+ ],
+ "edges": [
+  {
+   "id": "e-posts-api-auth",
+   "source": "posts-api",
+   "target": "auth",
+   "label": "getServerSession",
+   "animated": true,
+   "grounded": true,
+   "importCount": 2
+  },
+  {
+   "id": "e-posts-api-data",
+   "source": "posts-api",
+   "target": "data",
+   "label": "reads/writes posts",
+   "animated": true,
+   "grounded": true,
+   "importCount": 2
+  },
+  {
+   "id": "e-posts-api-subscriptions",
+   "source": "posts-api",
+   "target": "subscriptions",
+   "label": "plan limit check",
+   "animated": true,
+   "grounded": true,
+   "importCount": 1
+  },
+  {
+   "id": "e-users-billing-api-subscriptions",
+   "source": "users-billing-api",
+   "target": "subscriptions",
+   "label": "plan + Stripe client",
+   "animated": true,
+   "grounded": true,
+   "importCount": 3
+  },
+  {
+   "id": "e-users-billing-api-auth",
+   "source": "users-billing-api",
+   "target": "auth",
+   "label": "getServerSession",
+   "animated": true,
+   "grounded": true,
+   "importCount": 2
+  },
+  {
+   "id": "e-users-billing-api-data",
+   "source": "users-billing-api",
+   "target": "data",
+   "label": "updates user",
+   "animated": true,
+   "grounded": true,
+   "importCount": 1
+  },
+  {
+   "id": "e-stripe-webhook-data",
+   "source": "stripe-webhook",
+   "target": "data",
+   "label": "writes billing cols",
+   "animated": true,
+   "grounded": true,
+   "importCount": 1
+  },
+  {
+   "id": "e-stripe-webhook-subscriptions",
+   "source": "stripe-webhook",
+   "target": "subscriptions",
+   "label": "stripe client",
+   "animated": false,
+   "grounded": true,
+   "importCount": 1
+  },
+  {
+   "id": "e-auth-data",
+   "source": "auth",
+   "target": "data",
+   "label": "Prisma adapter",
+   "animated": true,
+   "grounded": true,
+   "importCount": 1
+  },
+  {
+   "id": "e-subscriptions-data",
+   "source": "subscriptions",
+   "target": "data",
+   "label": "reads user plan",
+   "animated": true,
+   "grounded": true,
+   "importCount": 1
+  },
+  {
+   "id": "e-dashboard-ui-data",
+   "source": "dashboard-ui",
+   "target": "data",
+   "label": "server queries",
+   "animated": true,
+   "grounded": true,
+   "importCount": 2
+  },
+  {
+   "id": "e-dashboard-ui-auth",
+   "source": "dashboard-ui",
+   "target": "auth",
+   "label": "getCurrentUser",
+   "animated": false,
+   "grounded": true,
+   "importCount": 4
+  },
+  {
+   "id": "e-marketing-site-config",
+   "source": "marketing-site",
+   "target": "config",
+   "label": "siteConfig",
+   "animated": false,
+   "grounded": true,
+   "importCount": 6
+  },
+  {
+   "id": "e-dashboard-ui-ui-components",
+   "source": "dashboard-ui",
+   "target": "ui-components",
+   "label": "renders",
+   "animated": false,
+   "grounded": true,
+   "importCount": 6
+  },
+  {
+   "id": "e-marketing-site-ui-components",
+   "source": "marketing-site",
+   "target": "ui-components",
+   "label": "renders",
+   "animated": false,
+   "grounded": true,
+   "importCount": 13
+  },
+  {
+   "id": "e-marketing-site-shared-lib",
+   "source": "marketing-site",
+   "target": "shared-lib",
+   "label": "imports",
+   "animated": false,
+   "grounded": true,
+   "importCount": 3
+  },
+  {
+   "id": "e-ui-components-shared-lib",
+   "source": "ui-components",
+   "target": "shared-lib",
+   "label": "imports",
+   "animated": false,
+   "grounded": true,
+   "importCount": 1
+  },
+  {
+   "id": "e-posts-api-shared-lib",
+   "source": "posts-api",
+   "target": "shared-lib",
+   "label": "imports",
+   "animated": false,
+   "grounded": true,
+   "importCount": 2
+  },
+  {
+   "id": "e-users-billing-api-shared-lib",
+   "source": "users-billing-api",
+   "target": "shared-lib",
+   "label": "imports",
+   "animated": false,
+   "grounded": true,
+   "importCount": 2
+  },
+  {
+   "id": "e-stripe-webhook-config",
+   "source": "stripe-webhook",
+   "target": "config",
+   "label": "imports",
+   "animated": false,
+   "grounded": true,
+   "importCount": 1
+  },
+  {
+   "id": "e-auth-config",
+   "source": "auth",
+   "target": "config",
+   "label": "imports",
+   "animated": false,
+   "grounded": true,
+   "importCount": 2
+  },
+  {
+   "id": "e-shared-lib-config",
+   "source": "shared-lib",
+   "target": "config",
+   "label": "imports",
+   "animated": false,
+   "grounded": true,
+   "importCount": 1
+  }
+ ],
+ "bugs": [
+  {
+   "id": "post-access-check-bypass",
+   "nodeId": "posts-api",
+   "severity": "high",
+   "title": "Unauthenticated requests pass the post ownership check",
+   "file": "app/api/posts/[postId]/route.ts",
+   "lineHint": "88",
+   "description": "verifyCurrentUserHasAccessToPost (lines 83-92) counts posts `where: { id: postId, authorId: session?.user.id }`. With no session, authorId is `undefined`, and Prisma treats an undefined filter as absent, so the query becomes `where: { id: postId }` and returns 1 for any existing post. middleware.ts only matches /dashboard, /editor, /login and /register, so a request to /api/posts/[postId] with no cookie can DELETE or PATCH any post whose id it knows.",
+   "suggestedFix": "Return false early when there is no session: `if (!session?.user?.id) return false`, then query with the real id. Respond 401 instead of 403 for missing auth. Add a route test that calls DELETE without a session and expects 401.",
+   "line": 88,
+   "verified": true,
+   "context": {
+    "startLine": 85,
+    "code": "  const count = await db.post.count({\n    where: {\n      id: postId,\n      authorId: session?.user.id,\n    },\n  })\n\n  return count > 0\n}",
+    "language": "typescript"
+   }
+  },
+  {
+   "id": "jwt-callback-email-lookup",
+   "nodeId": "auth",
+   "severity": "medium",
+   "title": "JWT callback resolves identity by a possibly-empty email",
+   "file": "lib/auth.ts",
+   "lineHint": "84-88",
+   "description": "On every token refresh the jwt callback runs `db.user.findFirst({ where: { email: token.email } })` and replaces the token with that user's id. The email column is nullable (schema.prisma line 48), and GitHub accounts without a public verified email produce a null email. `email: null` matches any other user with a null email, and an undefined email drops the filter so findFirst returns the first user. In both cases the session can end up with another account's id. It also costs a DB round-trip on every session read.",
+   "suggestedFix": "Look up by the stable id instead: on sign-in `user` is set, so copy `token.id = user.id`; on later calls query `findUnique({ where: { id: token.id } })`, and never query when the key is missing.",
+   "line": 84,
+   "verified": true,
+   "context": {
+    "startLine": 81,
+    "code": "      return session\n    },\n    async jwt({ token, user }) {\n      const dbUser = await db.user.findFirst({\n        where: {\n          email: token.email,\n        },\n      })\n",
+    "language": "typescript"
+   }
+  },
+  {
+   "id": "webhook-event-ordering",
+   "nodeId": "stripe-webhook",
+   "severity": "medium",
+   "title": "invoice.payment_succeeded can arrive before the subscription is linked",
+   "file": "app/api/webhooks/stripe/route.ts",
+   "lineHint": "57-67",
+   "description": "Stripe doesn't guarantee event order. The first invoice.payment_succeeded often arrives before checkout.session.completed has stored stripeSubscriptionId, so `db.user.update({ where: { stripeSubscriptionId } })` finds no row and Prisma throws. Nothing catches it, so the handler returns 500 and Stripe retries with backoff. The checkout branch (line 37) also passes `session?.metadata?.userId` without checking it, which throws the same way when metadata is missing.",
+   "suggestedFix": "Wrap each branch in try/catch. For invoices, use updateMany (no throw on 0 rows), or resolve the user by stripeCustomerId and fall back to the subscription's metadata. Return 200 for events you deliberately ignore and log unexpected misses.",
+   "line": 57,
+   "verified": true,
+   "context": {
+    "startLine": 54,
+    "code": "    )\n\n    // Update the price id and set the new period end.\n    await db.user.update({\n      where: {\n        stripeSubscriptionId: subscription.id,\n      },\n      data: {\n        stripePriceId: subscription.items.data[0].price.id,",
+    "language": "typescript"
+   }
+  },
+  {
+   "id": "webhook-wrong-object-cast",
+   "nodeId": "stripe-webhook",
+   "severity": "low",
+   "title": "Every webhook payload is cast to Checkout.Session",
+   "file": "app/api/webhooks/stripe/route.ts",
+   "lineHint": "24",
+   "description": "`event.data.object as Stripe.Checkout.Session` runs before the event type is checked, so the invoice.payment_succeeded branch treats a Stripe.Invoice as a checkout session. Reading `.subscription` happens to work because both types have that field, but the cast hides type errors and will silently break when Stripe changes the invoice shape (newer API versions move it).",
+   "suggestedFix": "Narrow per branch: `if (event.type === 'invoice.payment_succeeded') { const invoice = event.data.object as Stripe.Invoice; ... }`, or switch on event.type so TypeScript's discriminated union picks the right type.",
+   "line": 24,
+   "verified": true,
+   "context": {
+    "startLine": 21,
+    "code": "    return new Response(`Webhook Error: ${error.message}`, { status: 400 })\n  }\n\n  const session = event.data.object as Stripe.Checkout.Session\n\n  if (event.type === \"checkout.session.completed\") {\n    // Retrieve the subscription details from Stripe.\n    const subscription = await stripe.subscriptions.retrieve(\n      session.subscription as string",
+    "language": "typescript"
+   }
+  },
+  {
+   "id": "free-plan-limit-race",
+   "nodeId": "posts-api",
+   "severity": "low",
+   "title": "Free-plan post limit can be exceeded with concurrent requests",
+   "file": "app/api/posts/route.ts",
+   "lineHint": "55-69",
+   "description": "POST counts the user's posts (line 55) and creates a new one (line 69) as separate queries. Several parallel requests from a free user can all see count < 3 and each create a post, bypassing the 3-post limit.",
+   "suggestedFix": "Run the count and the create in one `db.$transaction` with Serializable isolation (or SELECT … FOR UPDATE on the user row), or enforce the limit with a DB-side check.",
+   "line": 55,
+   "verified": true,
+   "context": {
+    "startLine": 52,
+    "code": "    // If user is on a free plan.\n    // Check if user has reached limit of 3 posts.\n    if (!subscriptionPlan?.isPro) {\n      const count = await db.post.count({\n        where: {\n          authorId: user.id,\n        },\n      })\n",
+    "language": "typescript"
+   }
+  },
+  {
+   "id": "subscription-ts-nocheck",
+   "nodeId": "subscriptions",
+   "severity": "low",
+   "title": "Billing logic is excluded from type-checking",
+   "file": "lib/subscription.ts",
+   "lineHint": "27-29",
+   "description": "The file starts with `// @ts-nocheck`. As a result `isPro` is typed as boolean but evaluates to `string | null | boolean` (the `&&` returns stripePriceId's value), and `getTime() + 86_400_000` on a possibly-undefined date isn't flagged. This is the function every paywall decision depends on.",
+   "suggestedFix": "Remove @ts-nocheck and write `const isPro = Boolean(user.stripePriceId && user.stripeCurrentPeriodEnd && user.stripeCurrentPeriodEnd.getTime() + 86_400_000 > Date.now())`. Add unit tests for expired, active and grace-period cases.",
+   "line": 27,
+   "verified": true,
+   "context": {
+    "startLine": 24,
+    "code": "  }\n\n  // Check if user is on a pro plan.\n  const isPro =\n    user.stripePriceId &&\n    user.stripeCurrentPeriodEnd?.getTime() + 86_400_000 > Date.now()\n\n  const plan = isPro ? proPlan : freePlan\n",
+    "language": "typescript"
+   }
+  }
+ ],
+ "walkthrough": [
+  {
+   "step": 1,
+   "nodeId": "config",
+   "title": "Start here: stack and environment",
+   "explanation": "Skim the README and package.json, then open env.mjs. It's the typed entry point for every secret the code reads through `env.` (GitHub OAuth, Postmark templates, Stripe keys and webhook secret, NEXT_PUBLIC_APP_URL). prisma/schema.prisma additionally reads DATABASE_URL.",
+   "whatToReadFirst": "env.mjs"
+  },
+  {
+   "step": 2,
+   "nodeId": "marketing-site",
+   "title": "Entry point: the root layout and route groups",
+   "explanation": "app/layout.tsx wraps everything (fonts, theme, toaster, analytics). The folders in parentheses under app/ are route groups: (marketing), (docs), (auth), (dashboard) and (editor) each get their own layout without changing URLs.",
+   "whatToReadFirst": "app/layout.tsx"
+  },
+  {
+   "step": 3,
+   "nodeId": "auth",
+   "title": "Auth: NextAuth options and the middleware gate",
+   "explanation": "lib/auth.ts is the single source of auth config (providers, JWT callbacks), and server code calls getServerSession(authOptions). middleware.ts protects page routes only; API routes must check the session themselves.",
+   "whatToReadFirst": "lib/auth.ts (authOptions, callbacks.jwt)"
+  },
+  {
+   "step": 4,
+   "nodeId": "posts-api",
+   "title": "Core logic: the Posts API and plan limits",
+   "explanation": "The POST handler shows the app's main pattern: get the session, load the subscription plan, enforce the free-tier limit, validate with zod, then write through Prisma. [postId]/route.ts adds ownership checks for edits and deletes.",
+   "whatToReadFirst": "app/api/posts/route.ts (POST)"
+  },
+  {
+   "step": 5,
+   "nodeId": "data",
+   "title": "Data layer: Prisma schema and client",
+   "explanation": "User carries both NextAuth relations and Stripe billing columns, and Post stores Editor.js output as JSON. lib/db.ts reuses one PrismaClient across hot reloads in dev.",
+   "whatToReadFirst": "prisma/schema.prisma (User, Post)"
+  },
+  {
+   "step": 6,
+   "nodeId": "stripe-webhook",
+   "title": "Billing: checkout, webhook, plan derivation",
+   "explanation": "Follow the money: /api/users/stripe creates a Checkout session with the userId in metadata, the webhook writes subscription ids and period end, and lib/subscription.ts turns those columns into isPro.",
+   "whatToReadFirst": "app/api/webhooks/stripe/route.ts"
+  },
+  {
+   "step": 7,
+   "nodeId": "posts-api",
+   "title": "Good first contribution: close the post-access hole",
+   "explanation": "Make verifyCurrentUserHasAccessToPost return false when there's no session (Prisma ignores undefined filters), switch the missing-auth response to 401, and add a test. It's a two-line fix to a high-severity issue with an obvious regression test.",
+   "whatToReadFirst": "app/api/posts/[postId]/route.ts:83-92"
+  }
+ ],
+ "stats": {
+  "totalFiles": 188,
+  "analyzedFiles": 28,
+  "analyzedBytes": 63057,
+  "importEdges": 63,
+  "groundedEdges": 22
+ },
+ "generatedBy": {
+  "provider": "curated",
+  "model": "hand-authored from fetched source",
+  "analyzedAt": "2026-11-27T10:02:00.804Z",
+  "note": "Demo analysis written by hand from the same files the pipeline fetched; Stages 1-2 and the grounding pass ran live. Run npm run demos with an API key to regenerate it with the LLM."
+ }
+}

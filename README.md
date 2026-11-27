@@ -1,0 +1,74 @@
+# RepoLens
+
+Paste a public GitHub repo URL and get:
+
+1. **Architecture map**: an auto-laid-out React Flow graph of the repo's modules, with edges checked against real imports.
+2. **Bug radar**: findings ranked by severity, each with an exact `file:line`, the real source lines around it, and a suggested fix.
+3. **Guided tour**: a 5–7 step walkthrough for new contributors that pans the canvas to each module.
+
+The pipeline is built so the LLM's output is checked against the repository, not taken at face value.
+
+## Quick start
+
+```bash
+npm install
+cp .env.example .env.local   # add ANTHROPIC_API_KEY (and ideally GITHUB_TOKEN)
+npm run dev                  # http://localhost:3000
+```
+
+The three **Instant Demo** pills work with no API key.
+
+### Environment
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `LLM_PROVIDER` | `anthropic` | `anthropic` or `openai` |
+| `ANTHROPIC_API_KEY` | – | Required when the provider is `anthropic` |
+| `ANTHROPIC_MODEL` | `claude-opus-5-5` | Model for Stage 3 |
+| `ANTHROPIC_EFFORT` | `medium` | `low` … `max`; higher effort is slower but more thorough |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | – / `gpt-5` | Used when `LLM_PROVIDER=openai` |
+| `GITHUB_TOKEN` | – | Raises the GitHub limit from 60 to 5,000 req/h. Each analysis makes 2 API calls (raw file downloads don't count against it). |
+
+## How the pipeline works (`POST /api/analyze`, streamed as SSE)
+
+```
+Stage 1  lib/github.ts    repo meta + recursive tree → noise filter → signal scoring → top ~28 files (≤150 KB)
+Stage 2  lib/parser.ts    regex import/export extraction (TS/JS, Python, Go, Rust, JVM, Ruby), resolved against the full tree
+Stage 3  lib/analyzer.ts  outline + import graph + line-numbered sources → LLM → Zod-validated JSON
+Ground   lib/analyzer.ts  drop unknown paths, mark import-verified edges, add missed import edges,
+                          verify bug line numbers, replace snippets with the real lines from the file
+```
+
+- **File selection** scores manifests, READMEs, entry points, API routes, data-layer files and core `src/` code. It then makes two passes: first the best file from each area of the codebase (`lib/`, `prisma/`, `app/api`, …), then the remaining budget by score. Per-directory and per-area caps keep one big folder (or `examples/`) from crowding out the data layer.
+- **Structured output**: Anthropic uses `client.beta.messages.stream` with `betaZodOutputFormat(LlmAnalysisSchema)`, so the response is validated against the schema in `lib/types.ts`. Server-side refusal fallbacks are on (`fallbacks: "default"`). OpenAI uses `responses.parse` with `zodTextFormat`. Optional fields are `.nullable()` so one schema satisfies both providers' strict modes.
+- **Grounding** is shown in the UI. Import-verified edges are drawn in violet with a ✓ in the inspector; inferred runtime edges are drawn in gray. Every bug's code context comes from the fetched file, not from the model. Findings that cite files outside the repo are dropped.
+- An in-memory cache returns repeat analyses of the same repo (per server instance, 1 h) instantly.
+
+## Instant demos
+
+`public/demos/*.json` hold analyses of `pmndrs/zustand`, `expressjs/express` and `shadcn-ui/taxonomy`.
+
+**How they were made:** no LLM key was available while building, so the Stage 3 JSON in `demos-src/` was written by hand from the exact files the pipeline fetched. Stages 1–2 and the grounding pass ran live against GitHub: edge verification, line checks and code snippets are all real. Each demo says this in the inspector footer. To regenerate a demo with the model:
+
+```bash
+npm run demos -- https://github.com/pmndrs/zustand zustand            # full pipeline, needs a key
+npm run demos -- <url> <slug> --analysis demos-src/<slug>.json        # re-ground a stored analysis
+npm run ingest -- <url> --prompt prompt.txt                           # inspect Stages 1-2 / the prompt, no LLM
+```
+
+## Deploying
+
+Works on Vercel or Netlify as a standard Next.js app. `/api/analyze` sets `maxDuration = 300`: Stage 3 takes about 30–120 s depending on repo size and effort. Plans that cap functions lower (e.g. Vercel Hobby without Fluid compute) can time out on large repos; lower `ANTHROPIC_EFFORT` to `low` there.
+
+## Project layout
+
+```
+app/api/analyze/route.ts   SSE endpoint (progress → result | error)
+lib/github.ts              Stage 1: ingestion, pruning, scoring
+lib/parser.ts              Stage 2: static import graph
+lib/analyzer.ts            Stage 3 prompt + grounding + full pipeline
+lib/llm/                   provider adapters (anthropic.ts, openai.ts)
+lib/export.ts              Markdown report + Mermaid diagram export
+components/                Landing, Workspace, GraphCanvas (React Flow + dagre), Inspector, CodeBlock (Shiki)
+scripts/                   ingest.ts, generate-demos.ts
+```

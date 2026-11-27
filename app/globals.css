@@ -1,0 +1,236 @@
+@import "tailwindcss";
+
+/* Palette: black / white / signal red (reference: glitch "OFFLINE" poster). */
+@theme {
+  --color-bg: #050505;
+  --color-panel: #0b0b0b;
+  --color-panel-2: #141414;
+  --color-line: rgba(255, 255, 255, 0.09);
+  --color-line-strong: rgba(255, 255, 255, 0.18);
+  --color-fg: #f5f5f5;
+  --color-muted: #a3a3a3;
+  --color-dim: #6b6b6b;
+
+  --color-signal-200: #ffc2c2;
+  --color-signal-300: #ff8a8a;
+  --color-signal-400: #ff4d4d;
+  --color-signal-500: #ff1e1e;
+  --color-signal-600: #e00000;
+  --color-signal-700: #a80000;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv11", "ss01";
+}
+
+::selection {
+  background: #ff1e1e;
+  color: #000;
+}
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+
+/* ---------------- React Flow theming ---------------- */
+.react-flow {
+  --xy-background-color: transparent;
+  --xy-node-border-radius: 12px;
+  --xy-minimap-background-color: #000;
+  --xy-minimap-mask-background-color: rgba(0, 0, 0, 0.75);
+  --xy-edge-label-background-color: #000;
+  --xy-edge-label-color: #a3a3a3;
+  --xy-attribution-background-color: transparent;
+}
+
+.react-flow__minimap {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.react-flow__attribution {
+  display: none;
+}
+
+/* ---------------- Execution trace ---------------- */
+
+/* Edge trace: drawn with pathLength=1, so dashoffset 1 → 0 reveals the whole path. */
+.edge-trace {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: trace-draw var(--draw) cubic-bezier(0.55, 0, 0.25, 1) var(--delay) forwards;
+}
+
+@keyframes trace-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Node: sits dark until the trace arrives, flashes white-hot, then settles with a red rim. */
+.node-ignite {
+  animation: node-ignite 1100ms ease-out var(--ignite) both;
+}
+
+@keyframes node-ignite {
+  0% {
+    opacity: 0.4;
+    border-color: rgba(255, 255, 255, 0.06);
+    box-shadow: none;
+  }
+  18% {
+    opacity: 1;
+    border-color: #ffffff;
+    box-shadow:
+      0 0 0 1px #ffffff,
+      0 0 26px 4px rgba(255, 255, 255, 0.5),
+      0 0 60px 12px rgba(255, 30, 30, 0.4);
+  }
+  100% {
+    opacity: 1;
+    border-color: rgba(255, 30, 30, 0.38);
+    box-shadow:
+      0 0 0 1px rgba(255, 30, 30, 0.12),
+      0 10px 30px -14px rgba(255, 30, 30, 0.55);
+  }
+}
+
+.tile-ignite {
+  animation: tile-ignite 1100ms ease-out var(--ignite) both;
+}
+
+@keyframes tile-ignite {
+  0% {
+    filter: grayscale(1) brightness(0.6);
+  }
+  18% {
+    filter: brightness(2.2);
+    box-shadow: 0 0 22px 2px rgba(255, 255, 255, 0.55);
+  }
+  100% {
+    filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .edge-trace,
+  .node-ignite,
+  .tile-ignite {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ---------------- Glitch headline ---------------- */
+.glitch {
+  position: relative;
+  display: inline-block;
+}
+
+.glitch::before,
+.glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.glitch::before {
+  color: #ffffff;
+  clip-path: inset(0 0 60% 0);
+  animation: glitch-a 3.2s steps(1) infinite;
+}
+
+.glitch::after {
+  color: #ff1e1e;
+  clip-path: inset(55% 0 0 0);
+  animation: glitch-b 3.2s steps(1) infinite;
+}
+
+@keyframes glitch-a {
+  0%, 86%, 100% { transform: none; opacity: 0; }
+  87% { transform: translate(-4px, -1px); opacity: 0.9; }
+  89% { transform: translate(3px, 1px); opacity: 0.9; }
+  91% { transform: none; opacity: 0; }
+}
+
+@keyframes glitch-b {
+  0%, 86%, 100% { transform: none; opacity: 0; }
+  88% { transform: translate(5px, 1px); opacity: 1; }
+  90% { transform: translate(-3px, 0); opacity: 1; }
+  92% { transform: none; opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glitch::before,
+  .glitch::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* ---------------- Shiki code blocks ---------------- */
+.code-block pre {
+  background: transparent !important;
+  margin: 0;
+  padding: 12px 0;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.code-block code {
+  counter-reset: line var(--start, 0);
+  display: block;
+  min-width: max-content;
+}
+
+.code-block .line {
+  display: inline-block;
+  width: 100%;
+  padding-right: 16px;
+}
+
+.code-block .line::before {
+  counter-increment: line;
+  content: counter(line);
+  display: inline-block;
+  width: 3.2em;
+  margin-right: 14px;
+  padding-right: 10px;
+  text-align: right;
+  color: #4a4a4a;
+  user-select: none;
+}
+
+.code-block .line.hl {
+  background: rgba(255, 30, 30, 0.14);
+  box-shadow: inset 2px 0 0 #ff1e1e;
+}
+
+.glow-input {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 0 40px -10px rgba(255, 30, 30, 0.45);
+}
+
+.glow-input:focus-within {
+  box-shadow:
+    0 0 0 1px rgba(255, 30, 30, 0.75),
+    0 0 50px -8px rgba(255, 30, 30, 0.6);
+}

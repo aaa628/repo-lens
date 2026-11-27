@@ -1,0 +1,416 @@
+{
+ "repoMeta": {
+  "owner": "expressjs",
+  "name": "express",
+  "description": "Fast, unopinionated, minimalist web framework for node.",
+  "stars": 69780,
+  "primaryLanguage": "JavaScript",
+  "techStack": [
+   "Node.js ≥ 18",
+   "JavaScript (CommonJS)",
+   "router",
+   "body-parser",
+   "serve-static",
+   "finalhandler",
+   "qs",
+   "proxy-addr"
+  ],
+  "htmlUrl": "https://github.com/expressjs/express",
+  "defaultBranch": "master"
+ },
+ "summary": "Express 5 is a thin HTTP framework on top of Node's http module. createApplication() returns a request handler function with the application prototype mixed in; per-request it swaps the prototypes of Node's req/res for Express's extended versions and delegates routing to the separate `router` package. Settings (trust proxy, query parser, etag, view cache) are compiled into functions by utils.js, and views are resolved and rendered by the View class.",
+ "nodes": [
+  {
+   "id": "app-factory",
+   "label": "createApplication()",
+   "layer": "api",
+   "summary": "Package entry. index.js re-exports lib/express.js, which builds `app` as a (req, res, next) function, mixes in EventEmitter and the application prototype, creates per-app request/response prototypes and re-exports Router, json/urlencoded/raw/text and static middleware.",
+   "files": [
+    "index.js",
+    "lib/express.js"
+   ],
+   "fileCount": 2,
+   "keySnippet": {
+    "file": "lib/express.js",
+    "code": "function createApplication() {\n  var app = function(req, res, next) {\n    app.handle(req, res, next);\n  };\n\n  mixin(app, EventEmitter.prototype, false);\n  mixin(app, proto, false);",
+    "language": "javascript",
+    "startLine": 36
+   }
+  },
+  {
+   "id": "application",
+   "label": "Application Core",
+   "layer": "logic",
+   "summary": "The app prototype: settings store and inheritance on mount, lazily created router, app.handle (sets X-Powered-By, swaps req/res prototypes, hands off to the router), app.use mounting of middleware and sub-apps, app.render with the view cache, and app.listen.",
+   "files": [
+    "lib/application.js"
+   ],
+   "fileCount": 1,
+   "keySnippet": {
+    "file": "lib/application.js",
+    "code": "  // set circular references\n  req.res = res;\n  res.req = req;\n\n  // alter the prototypes\n  Object.setPrototypeOf(req, this.request)\n  Object.setPrototypeOf(res, this.response)\n\n  // setup locals\n  if (!res.locals) {\n    res.locals = Object.create(null);\n  }\n\n  this.router.handle(req, res, done);",
+    "language": "javascript",
+    "startLine": 164
+   }
+  },
+  {
+   "id": "router",
+   "label": "Router (external package)",
+   "layer": "logic",
+   "summary": "Routing moved out of core in Express 5: the `router` package matches paths, runs the middleware stack and route handlers. Express only instantiates it (app.router getter) and forwards app.use / app.route / app.param / app[method] to it.",
+   "files": [],
+   "fileCount": 0,
+   "keySnippet": {
+    "file": "lib/application.js",
+    "code": "  Object.defineProperty(this, 'router', {\n    configurable: true,\n    enumerable: true,\n    get: function getrouter() {\n      if (router === null) {\n        router = new Router({\n          caseSensitive: this.enabled('case sensitive routing'),\n          strict: this.enabled('strict routing')\n        });\n      }",
+    "language": "javascript",
+    "startLine": 69
+   }
+  },
+  {
+   "id": "request",
+   "label": "Request Extensions",
+   "layer": "api",
+   "summary": "Prototype layered over http.IncomingMessage: content negotiation (accepts*), req.is, and lazy getters such as query, protocol, secure, ip/ips, hostname, subdomains and fresh/stale — the proxy-aware ones consult the compiled 'trust proxy fn'.",
+   "files": [
+    "lib/request.js"
+   ],
+   "fileCount": 1,
+   "keySnippet": {
+    "file": "lib/request.js",
+    "code": "defineGetter(req, 'query', function query(){\n  var queryparse = this.app.get('query parser fn');\n\n  if (!queryparse) {\n    // parsing is disabled\n    return Object.create(null);\n  }\n\n  var querystring = parse(this).query;\n\n  return queryparse(querystring);\n});",
+    "language": "javascript",
+    "startLine": 230
+   }
+  },
+  {
+   "id": "response",
+   "label": "Response Helpers",
+   "layer": "api",
+   "summary": "Prototype layered over http.ServerResponse: status, send (ETag + freshness), json/jsonp, sendFile/download via `send`, format, cookie/clearCookie, location/redirect and render (which delegates to app.render).",
+   "files": [
+    "lib/response.js"
+   ],
+   "fileCount": 1,
+   "keySnippet": {
+    "file": "lib/response.js",
+    "code": "  // Set location header\n  address = this.location(address).get('Location');\n\n  // Support text/{plain,html} by default\n  this.format({\n    text: function(){\n      body = statuses.message[status] + '. Redirecting to ' + address\n    },",
+    "language": "javascript",
+    "startLine": 838
+   }
+  },
+  {
+   "id": "view",
+   "label": "View Resolution",
+   "layer": "frontend",
+   "summary": "View resolves a template name against one or more view roots (trying <name>.<ext> and <name>/index.<ext>), auto-loads an engine by requiring the module named after the extension, and forces engine callbacks to be async.",
+   "files": [
+    "lib/view.js"
+   ],
+   "fileCount": 1,
+   "keySnippet": {
+    "file": "lib/view.js",
+    "code": "  if (!opts.engines[this.ext]) {\n    // load engine\n    var mod = this.ext.slice(1)\n    debug('require \"%s\"', mod)\n\n    // default engine export\n    var fn = require(mod).__express\n\n    if (typeof fn !== 'function') {\n      throw new Error('Module \"' + mod + '\" does not provide a view engine.')\n    }",
+    "language": "javascript",
+    "startLine": 75
+   }
+  },
+  {
+   "id": "utils",
+   "label": "Settings Compilers & Utils",
+   "layer": "logic",
+   "summary": "Turns settings into functions: compileETag (weak/strong), compileQueryParser (simple via node:querystring, extended via qs), compileTrust (proxy-addr); plus content-type helpers and the list of HTTP methods used to generate app.get/app.post/….",
+   "files": [
+    "lib/utils.js"
+   ],
+   "fileCount": 1,
+   "keySnippet": {
+    "file": "lib/utils.js",
+    "code": "  switch (val) {\n    case true:\n    case 'simple':\n      fn = querystring.parse;\n      break;\n    case false:\n      break;\n    case 'extended':\n      fn = parseExtendedQueryString;\n      break;\n    default:\n      throw new TypeError('unknown value for query parser function: ' + val);\n  }",
+    "language": "javascript",
+    "startLine": 169
+   }
+  },
+  {
+   "id": "examples",
+   "label": "Examples",
+   "layer": "frontend",
+   "summary": "Runnable sample apps (auth, mvc, error-pages, route-map, …). The MVC example auto-mounts controllers that use a fake in-memory db.",
+   "files": [
+    "examples"
+   ],
+   "fileCount": 80,
+   "keySnippet": {
+    "file": "examples/mvc/controllers/user-pet/index.js",
+    "code": "exports.create = function(req, res, next){\n  var id = req.params.user_id;\n  var user = db.users[id];\n  var body = req.body;\n  if (!user) return next('route');\n  var pet = { name: body.pet.name };\n  pet.id = db.pets.push(pet) - 1;\n  user.pets.push(pet);",
+    "language": "javascript",
+    "startLine": 12
+   }
+  },
+  {
+   "id": "package-ci",
+   "label": "Package & CI",
+   "layer": "config",
+   "summary": "package.json (Node ≥ 18, dependencies on router, body-parser, send, serve-static…), lint config and GitHub workflows for CI and CodeQL.",
+   "files": [
+    "package.json",
+    ".eslintrc.yml",
+    ".github"
+   ],
+   "fileCount": 8
+  }
+ ],
+ "edges": [
+  {
+   "id": "e-app-factory-application",
+   "source": "app-factory",
+   "target": "application",
+   "label": "mixes in proto",
+   "animated": false,
+   "grounded": true,
+   "importCount": 1
+  },
+  {
+   "id": "e-app-factory-request",
+   "source": "app-factory",
+   "target": "request",
+   "label": "req prototype",
+   "animated": false,
+   "grounded": true,
+   "importCount": 1
+  },
+  {
+   "id": "e-app-factory-response",
+   "source": "app-factory",
+   "target": "response",
+   "label": "res prototype",
+   "animated": false,
+   "grounded": true,
+   "importCount": 1
+  },
+  {
+   "id": "e-application-router",
+   "source": "application",
+   "target": "router",
+   "label": "router.handle()",
+   "animated": true,
+   "grounded": false,
+   "importCount": 0
+  },
+  {
+   "id": "e-application-view",
+   "source": "application",
+   "target": "view",
+   "label": "new View()",
+   "animated": false,
+   "grounded": true,
+   "importCount": 1
+  },
+  {
+   "id": "e-application-utils",
+   "source": "application",
+   "target": "utils",
+   "label": "compile settings",
+   "animated": false,
+   "grounded": true,
+   "importCount": 1
+  },
+  {
+   "id": "e-response-utils",
+   "source": "response",
+   "target": "utils",
+   "label": "etag / charset",
+   "animated": false,
+   "grounded": true,
+   "importCount": 1
+  },
+  {
+   "id": "e-response-application",
+   "source": "response",
+   "target": "application",
+   "label": "app.render()",
+   "animated": true,
+   "grounded": false,
+   "importCount": 0
+  },
+  {
+   "id": "e-request-application",
+   "source": "request",
+   "target": "application",
+   "label": "reads settings",
+   "animated": true,
+   "grounded": false,
+   "importCount": 0
+  },
+  {
+   "id": "e-examples-app-factory",
+   "source": "examples",
+   "target": "app-factory",
+   "label": "require express",
+   "animated": true,
+   "grounded": false,
+   "importCount": 0
+  }
+ ],
+ "bugs": [
+  {
+   "id": "extended-query-prototype-keys",
+   "nodeId": "utils",
+   "severity": "medium",
+   "title": "Extended query parser lets query keys shadow Object.prototype",
+   "file": "lib/utils.js",
+   "lineHint": "267-271",
+   "description": "When an app opts into `app.set('query parser', 'extended')`, parsing uses qs with `allowPrototypes: true`. A request like `?hasOwnProperty=x` or `?toString=1` then overwrites those methods on req.query, and handler code such as `req.query.hasOwnProperty('page')` throws a TypeError. Any client can trigger that 500. The default parser is 'simple' (application.js line 97), so only opted-in apps are exposed.",
+   "suggestedFix": "Drop `allowPrototypes: true` (qs then ignores keys that collide with prototype properties), or parse into a null-prototype object with `plainObjects: true`. Note the change in the 5.x release notes.",
+   "line": 267,
+   "verified": true,
+   "context": {
+    "startLine": 264,
+    "code": " * @private\n */\n\nfunction parseExtendedQueryString(str) {\n  return qs.parse(str, {\n    allowPrototypes: true\n  });\n}\n",
+    "language": "javascript"
+   }
+  },
+  {
+   "id": "mvc-example-unvalidated-body",
+   "nodeId": "examples",
+   "severity": "medium",
+   "title": "MVC example controllers crash on malformed form bodies",
+   "file": "examples/mvc/controllers/user-pet/index.js",
+   "lineHint": "17",
+   "description": "create() reads `body.pet.name` without checking that `body.pet` exists, so a POST without that field throws a TypeError and returns 500. user/index.js (line 38) and pet/index.js (line 28) repeat the pattern. Example code gets copied into real apps, so this teaches an unsafe habit, and it also stores an empty or oversized pet name unchecked.",
+   "suggestedFix": "Validate before use: `if (!body.pet || typeof body.pet.name !== 'string' || !body.pet.name.trim()) return res.status(400).send('Pet name required')`. Apply the same guard in the user and pet controllers.",
+   "line": 17,
+   "verified": true,
+   "context": {
+    "startLine": 14,
+    "code": "  var user = db.users[id];\n  var body = req.body;\n  if (!user) return next('route');\n  var pet = { name: body.pet.name };\n  pet.id = db.pets.push(pet) - 1;\n  user.pets.push(pet);\n  res.message('Added pet ' + body.pet.name);\n  res.redirect('/user/' + id);\n};",
+    "language": "javascript"
+   }
+  },
+  {
+   "id": "req-query-getter-mutation",
+   "nodeId": "request",
+   "severity": "low",
+   "title": "req.query re-parses on every access, so mutations are lost",
+   "file": "lib/request.js",
+   "lineHint": "230-241",
+   "description": "In Express 5, req.query is a getter that calls the query parser on every read and returns a fresh object. Middleware that normalizes values in place (`req.query.page = Number(req.query.page)`) silently has no effect on later reads, and handlers that read req.query repeatedly re-parse the URL each time.",
+   "suggestedFix": "Memoize the parsed object per request (cache it on a symbol, keyed by req.url) so repeated reads are cheap and consistent. Alternatively, document that req.query is read-only and point users to res.locals for derived values.",
+   "line": 230,
+   "verified": true,
+   "context": {
+    "startLine": 227,
+    "code": " * @api public\n */\n\ndefineGetter(req, 'query', function query(){\n  var queryparse = this.app.get('query parser fn');\n\n  if (!queryparse) {\n    // parsing is disabled\n    return Object.create(null);",
+    "language": "javascript"
+   }
+  },
+  {
+   "id": "view-engine-require-from-extension",
+   "nodeId": "view",
+   "severity": "low",
+   "title": "View extension decides which module gets require()'d",
+   "file": "lib/view.js",
+   "lineHint": "81",
+   "description": "When no engine is registered for a view's extension, View does `require(this.ext.slice(1)).__express`. If an app passes user-influenced names to res.render (for example `res.render(req.params.page)`), the request controls which installed package is loaded and invoked as a template engine. The `__express` check limits this to real engines, but it still widens the attack surface and lets unexpected engines execute templates.",
+   "suggestedFix": "Register engines explicitly via app.engine() at startup and add an opt-out setting such as `app.set('view engine autoload', false)` that makes unknown extensions throw instead of require()-ing.",
+   "line": 81,
+   "verified": true,
+   "context": {
+    "startLine": 78,
+    "code": "    debug('require \"%s\"', mod)\n\n    // default engine export\n    var fn = require(mod).__express\n\n    if (typeof fn !== 'function') {\n      throw new Error('Module \"' + mod + '\" does not provide a view engine.')\n    }\n",
+    "language": "javascript"
+   }
+  },
+  {
+   "id": "x-powered-by-default",
+   "nodeId": "application",
+   "severity": "low",
+   "title": "X-Powered-By: Express is sent by default",
+   "file": "lib/application.js",
+   "lineHint": "94",
+   "description": "defaultConfiguration() enables 'x-powered-by', and app.handle (lines 160-162) adds the header to every response. It advertises the framework to scanners for no functional benefit, and many security checklists flag it.",
+   "suggestedFix": "Keep the default for compatibility but call it out in the security best-practices docs (`app.disable('x-powered-by')`), or flip the default in the next major version.",
+   "line": 94,
+   "verified": true,
+   "context": {
+    "startLine": 91,
+    "code": "  var env = process.env.NODE_ENV || 'development';\n\n  // default settings\n  this.enable('x-powered-by');\n  this.set('etag', 'weak');\n  this.set('env', env);\n  this.set('query parser', 'simple')\n  this.set('subdomain offset', 2);\n  this.set('trust proxy', false);",
+    "language": "javascript"
+   }
+  },
+  {
+   "id": "view-lookup-sync-stat",
+   "nodeId": "view",
+   "severity": "low",
+   "title": "Uncached view lookups block the event loop with statSync",
+   "file": "lib/view.js",
+   "lineHint": "197-205",
+   "description": "View.resolve calls tryStat, which uses fs.statSync up to twice per root for every render. 'view cache' is enabled only when NODE_ENV === 'production' (application.js lines 138-140), so staging environments that forget NODE_ENV do synchronous filesystem I/O on the request path.",
+   "suggestedFix": "Use fs.promises.stat in an async lookup path (View.render is already callback-based), or log a startup warning when 'view cache' is disabled outside development.",
+   "line": 197,
+   "verified": true,
+   "context": {
+    "startLine": 194,
+    "code": " * @private\n */\n\nfunction tryStat(path) {\n  debug('stat \"%s\"', path);\n\n  try {\n    return fs.statSync(path);\n  } catch (e) {",
+    "language": "javascript"
+   }
+  }
+ ],
+ "walkthrough": [
+  {
+   "step": 1,
+   "nodeId": "package-ci",
+   "title": "Start here: what Express 5 depends on",
+   "explanation": "Skim package.json first. In Express 5, much of the behavior lives in dependencies: routing is the `router` package, and parsing comes from body-parser and serve-static. Knowing that tells you which bugs belong in this repo and which belong upstream.",
+   "whatToReadFirst": "package.json (dependencies)"
+  },
+  {
+   "step": 2,
+   "nodeId": "app-factory",
+   "title": "Entry point: an app is just a function",
+   "explanation": "lib/express.js creates `app` as a plain (req, res, next) function, mixes in EventEmitter and the application prototype, and builds request/response prototypes that point back to the app. That's why you can pass an Express app directly to http.createServer.",
+   "whatToReadFirst": "lib/express.js (createApplication)"
+  },
+  {
+   "step": 3,
+   "nodeId": "application",
+   "title": "Core logic: settings, mounting and app.handle",
+   "explanation": "Read app.init/defaultConfiguration for the default settings, then app.handle: it sets X-Powered-By, swaps the prototypes of Node's req/res, creates res.locals and hands off to the router. app.use shows how sub-apps inherit settings on 'mount'.",
+   "whatToReadFirst": "lib/application.js (app.handle, app.use, app.set)"
+  },
+  {
+   "step": 4,
+   "nodeId": "request",
+   "title": "The request/response surface",
+   "explanation": "Most of what users touch lives in these two prototypes. Note how proxy-aware getters (protocol, ip, hostname) only trust X-Forwarded-* headers when the compiled 'trust proxy fn' allows it.",
+   "whatToReadFirst": "lib/request.js (protocol, host, query getters)"
+  },
+  {
+   "step": 5,
+   "nodeId": "utils",
+   "title": "Settings become functions",
+   "explanation": "utils.js turns declarative settings into the functions used at request time: compileTrust → proxy-addr, compileQueryParser → querystring or qs, compileETag → etag. This is where a setting change actually alters runtime behavior.",
+   "whatToReadFirst": "lib/utils.js (compileQueryParser, compileTrust)"
+  },
+  {
+   "step": 6,
+   "nodeId": "examples",
+   "title": "Good first contribution: harden the MVC example",
+   "explanation": "The MVC example controllers dereference req.body fields without checks, so malformed POSTs crash with a 500. Adding input validation and a 400 response in the three controllers is a contained, reviewable first PR that improves code people copy.",
+   "whatToReadFirst": "examples/mvc/controllers/user-pet/index.js:12-22"
+  }
+ ],
+ "stats": {
+  "totalFiles": 216,
+  "analyzedFiles": 13,
+  "analyzedBytes": 76636,
+  "importEdges": 10,
+  "groundedEdges": 6
+ },
+ "generatedBy": {
+  "provider": "curated",
+  "model": "hand-authored from fetched source",
+  "analyzedAt": "2026-11-27T09:57:13.903Z",
+  "note": "Demo analysis written by hand from the same files the pipeline fetched; Stages 1-2 and the grounding pass ran live. Run npm run demos with an API key to regenerate it with the LLM."
+ }
+}
