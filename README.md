@@ -75,7 +75,7 @@ Works on Vercel or Netlify as a standard Next.js app. `/api/analyze` sets `maxDu
 ## Project layout
 
 ```
-app/page.tsx               landing page (server component; only AnalyzeForm is client JS)
+app/page.tsx               landing page (server component; the form is a plain GET form, no page JS)
 app/how-it-works/          docs page
 app/analyze/page.tsx       reads ?repo= / ?demo= and renders the RepoLens client app
 app/api/analyze/route.ts   SSE endpoint (progress → result | error)
