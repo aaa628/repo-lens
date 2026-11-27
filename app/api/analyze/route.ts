@@ -46,6 +46,8 @@ export async function POST(req: Request) {
 
         const result = await analyzeRepo(url, (p) => send("progress", p), req.signal);
         cache.set(key, { at: Date.now(), result });
+        // Bounded so a long-running server doesn't keep every repo it ever analyzed (oldest goes first).
+        if (cache.size > 200) cache.delete(cache.keys().next().value!);
         send("result", result);
       } catch (err) {
         if (req.signal.aborted) return;

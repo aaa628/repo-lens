@@ -447,7 +447,6 @@ function CameraController({
 
   useEffect(() => {
     if (ready) flyIn();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, run]);
 
   // Compare nonces instead of a "first run" flag: StrictMode re-runs effects in dev and would fire a stray fitView.
@@ -461,7 +460,6 @@ function CameraController({
     } else {
       void rf.fitView({ padding: 0.18, duration: 650 });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus.nonce]);
   return null;
 }

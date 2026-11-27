@@ -1,4 +1,5 @@
-import type { AnalysisResult } from "./types";
+import { LAYERS, type AnalysisResult } from "./types";
+import { blobUrl } from "./ui";
 
 function mermaidId(id: string) {
   return id.replace(/[^A-Za-z0-9_]/g, "_");
@@ -10,8 +11,7 @@ function esc(s: string) {
 
 export function toMermaid(a: AnalysisResult): string {
   const lines = ["flowchart LR"];
-  const layers = ["frontend", "api", "logic", "data", "config"] as const;
-  for (const layer of layers) {
+  for (const layer of LAYERS) {
     const ns = a.nodes.filter((n) => n.layer === layer);
     if (!ns.length) continue;
     lines.push(`  subgraph ${layer}["${layer.toUpperCase()}"]`);
@@ -29,7 +29,7 @@ export function toMermaid(a: AnalysisResult): string {
     "  classDef data fill:#1a0505,stroke:#ff7070,color:#ffe5e5",
     "  classDef config fill:#0b0b0b,stroke:#6f6f6f,color:#bdbdbd",
   );
-  for (const layer of layers) {
+  for (const layer of LAYERS) {
     const ids = a.nodes.filter((n) => n.layer === layer).map((n) => mermaidId(n.id));
     if (ids.length) lines.push(`  class ${ids.join(",")} ${layer}`);
   }
@@ -39,8 +39,7 @@ export function toMermaid(a: AnalysisResult): string {
 export function toMarkdown(a: AnalysisResult): string {
   const { repoMeta: m } = a;
   const nodeLabel = (id: string) => a.nodes.find((n) => n.id === id)?.label ?? id;
-  const blob = (file: string, line?: number) =>
-    `${m.htmlUrl}/blob/${m.defaultBranch}/${file}${line ? `#L${line}` : ""}`;
+  const blob = (file: string, line?: number) => blobUrl(m.htmlUrl, m.defaultBranch, file, line);
 
   const out: string[] = [];
   out.push(`# ${m.owner}/${m.name} — Architecture Overview`, "");

@@ -207,7 +207,7 @@ function resolveSpec(file: string, lang: string, spec: string, ctx: Ctx): { inte
       if (r) return { internal: r };
     }
     const pkg = spec.startsWith("@") ? spec.split("/").slice(0, 2).join("/") : spec.split("/")[0];
-    return { external: pkg.replace(/^node:/, "node:") };
+    return { external: pkg };
   }
 
   if (lang === "python") {

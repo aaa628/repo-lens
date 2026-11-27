@@ -17,15 +17,16 @@ import {
   Star,
   Workflow,
 } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { download, toMarkdown, toMermaid } from "@/lib/export";
 import type { AnalysisResult } from "@/lib/types";
 import { formatStars, LAYER_STYLE } from "@/lib/ui";
 import GraphCanvas, { type Focus } from "./GraphCanvas";
 import Inspector, { type Mode } from "./Inspector";
-import { Logo } from "./Landing";
+import { Logo } from "./Site";
 
-export default function Workspace({ data, isDemo, onReset }: { data: AnalysisResult; isDemo: boolean; onReset: () => void }) {
+export default function Workspace({ data, isDemo }: { data: AnalysisResult; isDemo: boolean }) {
   const [mode, setModeState] = useState<Mode>("architecture");
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedBugId, setSelectedBugId] = useState<string | null>(null);
@@ -137,10 +138,10 @@ export default function Workspace({ data, isDemo, onReset }: { data: AnalysisRes
     <div className="flex h-dvh flex-col overflow-hidden bg-bg">
       {/* ---------------- Top bar ---------------- */}
       <header className="flex h-[52px] shrink-0 items-center gap-3 border-b border-line bg-panel/80 px-3 backdrop-blur sm:px-4">
-        <button onClick={onReset} className="flex items-center gap-2" title="Analyze another repo">
+        <Link href="/" className="flex items-center gap-2" title="Analyze another repo">
           <Logo />
           <span className="text-sm font-semibold tracking-tight max-lg:hidden">RepoLens</span>
-        </button>
+        </Link>
         <span className="h-5 w-px bg-line max-sm:hidden" />
         <div className="flex min-w-0 items-center gap-2">
           <a

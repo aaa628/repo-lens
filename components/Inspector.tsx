@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowDownLeft,
   ArrowLeft,
-
   ArrowUpRight,
   BadgeCheck,
   BookOpen,
@@ -21,7 +20,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type { AnalysisResult, ArchNode, Bug, Severity } from "@/lib/types";
+import { LAYERS, type AnalysisResult, type ArchNode, type Bug, type Severity } from "@/lib/types";
 import { blobUrl, LAYER_STYLE, SEVERITY_STYLE } from "@/lib/ui";
 import CodeBlock from "./CodeBlock";
 
@@ -70,8 +69,7 @@ function ArchitecturePanel({
   const label = (id: string) => data.nodes.find((n) => n.id === id)?.label ?? id;
 
   if (!node) {
-    const byLayer = (["frontend", "api", "logic", "data", "config"] as const)
-      .map((l) => ({ layer: l, nodes: data.nodes.filter((n) => n.layer === l) }))
+    const byLayer = LAYERS.map((l) => ({ layer: l, nodes: data.nodes.filter((n) => n.layer === l) }))
       .filter((g) => g.nodes.length);
     const s = data.stats;
     return (
@@ -556,7 +554,7 @@ export default function Inspector(props: {
             data={data}
             selectedNodeId={props.selectedNodeId}
             onSelectNode={props.onSelectNode}
-            onSelectBug={(id) => props.onSelectBug(id)}
+            onSelectBug={props.onSelectBug}
           />
         )}
         {mode === "bugs" && <BugRadarPanel data={data} selectedBugId={props.selectedBugId} onSelectBug={props.onSelectBug} />}
@@ -565,5 +563,3 @@ export default function Inspector(props: {
     </div>
   );
 }
-
-
