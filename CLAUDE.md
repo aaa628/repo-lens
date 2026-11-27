@@ -52,11 +52,12 @@ Most dependencies are newer than typical training data. Check `node_modules` typ
 
 ### UI (client)
 
-- Pages: `/` (`app/page.tsx`, a server component; the only client JS is `AnalyzeForm`) and `/how-it-works` are static marketing pages sharing `SiteHeader`/`SiteFooter`/`DemoLinks` from `components/Site.tsx`. Keep them server components so the landing page doesn't ship React Flow. `next.config.ts` redirects the old `/?demo=` and `/?repo=` links to `/analyze`.
+- Pages: `/` (`app/page.tsx`, a server component; `AnalyzeForm` is a plain GET form to `/analyze`, which canonicalizes the pasted URL) and `/how-it-works` are static marketing pages sharing `SiteHeader`/`SiteFooter`/`DemoLinks` from `components/Site.tsx`. Keep them server components so the landing page doesn't ship React Flow. `next.config.ts` redirects the old `/?demo=` and `/?repo=` links to `/analyze`.
 - `app/analyze/page.tsx` reads `?repo=owner/name` or `?demo=<slug>` (unknown demo → 404, neither → redirect home) and renders `components/RepoLens.tsx`: phases loading → workspace | error, SSE consumption. Cancel and the workspace logo are plain links home; unmounting aborts the request.
 - `components/Workspace.tsx` owns all interaction state: `mode` (architecture | bugs | tour), selected node/bug, tour step. It derives `highlight` (node ids kept bright; others dimmed) and `activeNodeId` per mode. Camera moves are requested by bumping a `Focus` **nonce**; `CameraController` in `GraphCanvas` reacts to nonce changes. Compare nonces, not "first run" flags: StrictMode double-runs effects in dev.
 - `components/GraphCanvas.tsx`: dagre LR layout, custom `arch` node and `flow` edge (smooth-step paths). The **execution-trace animation** comes from `schedule()` (BFS levels from entry nodes → per-edge delay and per-node ignite time; timing constants `STEP`/`DRAW`). It is driven by CSS keyframes in `globals.css` (`edge-trace` via `pathLength=1` dashoffset, `node-ignite`, `tile-ignite`) plus SMIL sparks started with `beginElementAt`. Replays work by bumping `run`, which is used as a React `key` so animated elements remount. Respects `prefers-reduced-motion`.
-- `components/Inspector.tsx`: the three right-panel modes. `CodeBlock.tsx` lazy-loads Shiki on the client, with real line numbers via a CSS counter (`--start`) and a highlighted line.
+- Small entrance animations (menus, expanded findings, tour steps) use the `.fade-in` CSS class; there is no animation library.
+- `components/Inspector.tsx`: the three right-panel modes. `CodeBlock.tsx` lazy-loads one shared Shiki highlighter on the JS regex engine (not the WASM one), with real line numbers via a CSS counter (`--start`) and a highlighted line.
 - `lib/export.ts`: Markdown report + Mermaid export. Solid arrows are grounded edges, dotted arrows inferred.
 
 ### Visual design

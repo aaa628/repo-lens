@@ -1,7 +1,6 @@
 "use client";
 
 import { ReactFlowProvider } from "@xyflow/react";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   Bug,
   Check,
@@ -176,9 +175,7 @@ export default function Workspace({ data, isDemo }: { data: AnalysisResult; isDe
               onClick={() => setMode(id)}
               className={`relative flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12.5px] transition ${mode === id ? "text-fg" : "text-dim hover:text-muted"}`}
             >
-              {mode === id && (
-                <motion.span layoutId="tab-pill" className="absolute inset-0 rounded-md bg-white/[0.07] ring-1 ring-line-strong" transition={{ duration: 0.2 }} />
-              )}
+              {mode === id && <span className="absolute inset-0 rounded-md bg-white/[0.07] ring-1 ring-line-strong" />}
               <Icon size={13} className="relative" />
               <span className="relative max-md:hidden">{label}</span>
               {count !== undefined && count > 0 && (
@@ -217,31 +214,20 @@ export default function Workspace({ data, isDemo }: { data: AnalysisResult; isDe
           <Legend />
         </div>
 
-        <AnimatePresence initial={false}>
-          {inspectorOpen && (
-            <motion.aside
-              key="inspector"
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: "var(--inspector-w)", opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-              className="shrink-0 overflow-hidden border-l border-line bg-panel [--inspector-w:clamp(340px,30vw,480px)] max-md:absolute max-md:inset-y-0 max-md:right-0 max-md:z-20 max-md:[--inspector-w:min(100vw,420px)] max-md:shadow-2xl"
-            >
-              <div className="h-full w-[var(--inspector-w)]">
-                <Inspector
-                  data={data}
-                  mode={mode}
-                  selectedNodeId={selectedNodeId}
-                  onSelectNode={selectNode}
-                  selectedBugId={selectedBugId}
-                  onSelectBug={selectBug}
-                  tourStep={tourStep}
-                  setTourStep={setTourStep}
-                />
-              </div>
-            </motion.aside>
-          )}
-        </AnimatePresence>
+        {inspectorOpen && (
+          <aside className="w-[var(--inspector-w)] shrink-0 overflow-hidden border-l border-line bg-panel [--inspector-w:clamp(340px,30vw,480px)] max-md:absolute max-md:inset-y-0 max-md:right-0 max-md:z-20 max-md:[--inspector-w:min(100vw,420px)] max-md:shadow-2xl">
+            <Inspector
+              data={data}
+              mode={mode}
+              selectedNodeId={selectedNodeId}
+              onSelectNode={selectNode}
+              selectedBugId={selectedBugId}
+              onSelectBug={selectBug}
+              tourStep={tourStep}
+              setTourStep={setTourStep}
+            />
+          </aside>
+        )}
       </div>
     </div>
   );
@@ -273,9 +259,10 @@ function ExportMenu({ data }: { data: AnalysisResult }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
-    const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
-    window.addEventListener("mousedown", close);
-    return () => window.removeEventListener("mousedown", close);
+    const close = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    // Capture phase: the graph canvas swallows mouse events, so a bubbling listener never hears clicks on it.
+    window.addEventListener("pointerdown", close, true);
+    return () => window.removeEventListener("pointerdown", close, true);
   }, [open]);
 
   const base = `${data.repoMeta.owner}-${data.repoMeta.name}`;
@@ -305,32 +292,24 @@ function ExportMenu({ data }: { data: AnalysisResult }) {
         <span className="max-sm:hidden">Export</span>
         <ChevronDown size={12} className="max-sm:hidden" />
       </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: -4, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.98 }}
-            transition={{ duration: 0.12 }}
-            className="absolute right-0 top-full z-50 mt-1.5 w-52 overflow-hidden rounded-lg border border-line-strong bg-panel-2 p-1 shadow-2xl"
-          >
-            {items.map((it) => (
-              <button
-                key={it.hint + it.label}
-                onClick={() => {
-                  it.run();
-                  if (!it.keepOpen) setOpen(false);
-                }}
-                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-zinc-300 hover:bg-white/[0.06] hover:text-fg"
-              >
-                <it.icon size={13} className="text-dim" />
-                {it.label}
-                <span className="ml-auto font-mono text-[10.5px] text-dim">{it.hint}</span>
-              </button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {open && (
+        <div className="fade-in absolute right-0 top-full z-50 mt-1.5 w-52 overflow-hidden rounded-lg border border-line-strong bg-panel-2 p-1 shadow-2xl">
+          {items.map((it) => (
+            <button
+              key={it.hint + it.label}
+              onClick={() => {
+                it.run();
+                if (!it.keepOpen) setOpen(false);
+              }}
+              className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-zinc-300 hover:bg-white/[0.06] hover:text-fg"
+            >
+              <it.icon size={13} className="text-dim" />
+              {it.label}
+              <span className="ml-auto font-mono text-[10.5px] text-dim">{it.hint}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

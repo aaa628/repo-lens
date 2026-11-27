@@ -1,6 +1,5 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowDownLeft,
   ArrowLeft,
@@ -293,48 +292,39 @@ function BugCard({ bug, data, open, onClick }: { bug: Bug; data: AnalysisResult;
           {bug.file}:{bug.lineHint}
         </div>
       </button>
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.22 }}
-          >
-            <div className="space-y-3 px-3 pb-3">
-              <p className="text-[12.5px] leading-relaxed text-zinc-300">{bug.description}</p>
-              {bug.context ? (
-                <CodeBlock
-                  code={bug.context.code}
-                  language={bug.context.language}
-                  startLine={bug.context.startLine}
-                  highlightLine={bug.line}
-                  file={bug.file}
-                  href={blobUrl(m.htmlUrl, m.defaultBranch, bug.file, bug.line)}
-                />
-              ) : (
-                <div className="rounded-md border border-signal-400/20 bg-signal-400/[0.06] px-2.5 py-1.5 text-[11.5px] text-signal-300/90">
-                  Line {bug.lineHint} couldn&apos;t be verified against the fetched source.
-                </div>
-              )}
-              <div className="rounded-md border border-white/20 bg-white/[0.05] p-2.5">
-                <div className="mb-1 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-zinc-100">
-                  <Wrench size={11} /> Suggested fix
-                </div>
-                <p className="text-[12.5px] leading-relaxed text-zinc-300">{bug.suggestedFix}</p>
-              </div>
-              <a
-                href={blobUrl(m.htmlUrl, m.defaultBranch, bug.file, bug.line)}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-[11.5px] text-signal-300 hover:text-signal-200"
-              >
-                Open on GitHub <ExternalLink size={11} />
-              </a>
+      {open && (
+        <div className="fade-in space-y-3 px-3 pb-3">
+          <p className="text-[12.5px] leading-relaxed text-zinc-300">{bug.description}</p>
+          {bug.context ? (
+            <CodeBlock
+              code={bug.context.code}
+              language={bug.context.language}
+              startLine={bug.context.startLine}
+              highlightLine={bug.line}
+              file={bug.file}
+              href={blobUrl(m.htmlUrl, m.defaultBranch, bug.file, bug.line)}
+            />
+          ) : (
+            <div className="rounded-md border border-signal-400/20 bg-signal-400/[0.06] px-2.5 py-1.5 text-[11.5px] text-signal-300/90">
+              Line {bug.lineHint} couldn&apos;t be verified against the fetched source.
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+          <div className="rounded-md border border-white/20 bg-white/[0.05] p-2.5">
+            <div className="mb-1 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-zinc-100">
+              <Wrench size={11} /> Suggested fix
+            </div>
+            <p className="text-[12.5px] leading-relaxed text-zinc-300">{bug.suggestedFix}</p>
+          </div>
+          <a
+            href={blobUrl(m.htmlUrl, m.defaultBranch, bug.file, bug.line)}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-[11.5px] text-signal-300 hover:text-signal-200"
+          >
+            Open on GitHub <ExternalLink size={11} />
+          </a>
+        </div>
+      )}
     </li>
   );
 }
@@ -443,57 +433,48 @@ function TourPanel({ data, step, setStep }: { data: AnalysisResult; step: number
         ))}
       </ol>
 
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={step}
-          initial={{ opacity: 0, x: 12 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -12 }}
-          transition={{ duration: 0.2 }}
-          className="space-y-4"
-        >
-          <div className="font-mono text-[11px] text-dim">
-            Step {step + 1} of {steps.length}
+      <div key={step} className="fade-in space-y-4">
+        <div className="font-mono text-[11px] text-dim">
+          Step {step + 1} of {steps.length}
+        </div>
+        <h2 className="text-lg font-semibold leading-snug tracking-tight">
+          {last && <Flag size={15} className="mr-1.5 inline -translate-y-px text-zinc-100" />}
+          {current.title}
+        </h2>
+        {node && (
+          <div className="flex items-center gap-2">
+            <LayerBadge layer={node.layer} />
+            <span className="text-[12.5px] text-muted">{node.label}</span>
           </div>
-          <h2 className="text-lg font-semibold leading-snug tracking-tight">
-            {last && <Flag size={15} className="mr-1.5 inline -translate-y-px text-zinc-100" />}
-            {current.title}
-          </h2>
-          {node && (
-            <div className="flex items-center gap-2">
-              <LayerBadge layer={node.layer} />
-              <span className="text-[12.5px] text-muted">{node.label}</span>
-            </div>
-          )}
-          <p className="text-[13px] leading-relaxed text-zinc-300">{current.explanation}</p>
-          <div className={`rounded-lg border p-3 ${last ? "border-white/25 bg-white/[0.05]" : "border-signal-500/25 bg-signal-500/[0.05]"}`}>
-            <div className={`mb-1.5 flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-wider ${last ? "text-zinc-100" : "text-signal-300"}`}>
-              {last ? <Lightbulb size={11} /> : <BookOpen size={11} />} {last ? "Where to start" : "Read first"}
-            </div>
-            {readPath ? (
-              <a
-                href={blobUrl(m.htmlUrl, m.defaultBranch, readPath)}
-                target="_blank"
-                rel="noreferrer"
-                className="break-all font-mono text-[12px] text-fg hover:underline"
-              >
-                {current.whatToReadFirst}
-              </a>
-            ) : (
-              <span className="font-mono text-[12px] text-fg">{current.whatToReadFirst}</span>
-            )}
+        )}
+        <p className="text-[13px] leading-relaxed text-zinc-300">{current.explanation}</p>
+        <div className={`rounded-lg border p-3 ${last ? "border-white/25 bg-white/[0.05]" : "border-signal-500/25 bg-signal-500/[0.05]"}`}>
+          <div className={`mb-1.5 flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-wider ${last ? "text-zinc-100" : "text-signal-300"}`}>
+            {last ? <Lightbulb size={11} /> : <BookOpen size={11} />} {last ? "Where to start" : "Read first"}
           </div>
-          {node?.keySnippet && (
-            <CodeBlock
-              code={node.keySnippet.code}
-              language={node.keySnippet.language}
-              startLine={node.keySnippet.startLine ?? 1}
-              file={node.keySnippet.file}
-              href={blobUrl(m.htmlUrl, m.defaultBranch, node.keySnippet.file, node.keySnippet.startLine)}
-            />
+          {readPath ? (
+            <a
+              href={blobUrl(m.htmlUrl, m.defaultBranch, readPath)}
+              target="_blank"
+              rel="noreferrer"
+              className="break-all font-mono text-[12px] text-fg hover:underline"
+            >
+              {current.whatToReadFirst}
+            </a>
+          ) : (
+            <span className="font-mono text-[12px] text-fg">{current.whatToReadFirst}</span>
           )}
-        </motion.div>
-      </AnimatePresence>
+        </div>
+        {node?.keySnippet && (
+          <CodeBlock
+            code={node.keySnippet.code}
+            language={node.keySnippet.language}
+            startLine={node.keySnippet.startLine ?? 1}
+            file={node.keySnippet.file}
+            href={blobUrl(m.htmlUrl, m.defaultBranch, node.keySnippet.file, node.keySnippet.startLine)}
+          />
+        )}
+      </div>
 
       <div className="sticky bottom-0 mt-auto flex items-center justify-between gap-2 bg-panel pt-5">
         <button

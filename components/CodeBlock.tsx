@@ -2,6 +2,19 @@
 
 import { Check, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
+import type { BundledLanguage } from "shiki";
+
+const THEME = "github-dark-default";
+
+// One shared highlighter on Shiki's JS regex engine: the default WASM engine is a ~150 KB (gzipped) download.
+let highlighter: ReturnType<typeof createShiki> | undefined;
+async function createShiki() {
+  const [{ createHighlighter }, { createJavaScriptRegexEngine }] = await Promise.all([
+    import("shiki"),
+    import("shiki/engine/javascript"),
+  ]);
+  return createHighlighter({ themes: [THEME], langs: [], engine: createJavaScriptRegexEngine({ forgiving: true }) });
+}
 
 /** Client-side Shiki highlighting with real line numbers and an optional highlighted line. */
 export default function CodeBlock({
@@ -25,11 +38,11 @@ export default function CodeBlock({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { codeToHtml } = await import("shiki");
+      const shiki = await (highlighter ??= createShiki());
       const render = (lang: string) =>
-        codeToHtml(code, {
+        shiki.codeToHtml(code, {
           lang,
-          theme: "github-dark-default",
+          theme: THEME,
           transformers: [
             {
               line(node, line) {
@@ -38,11 +51,13 @@ export default function CodeBlock({
             },
           ],
         });
+      const lang = language === "docker" ? "dockerfile" : language;
       let out: string;
       try {
-        out = await render(language === "docker" ? "dockerfile" : language);
+        await shiki.loadLanguage(lang as BundledLanguage);
+        out = render(lang);
       } catch {
-        out = await render("text");
+        out = render("text");
       }
       if (!cancelled) setHtml(out);
     })();
