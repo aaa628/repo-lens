@@ -1,6 +1,7 @@
 import { analyzeRepo } from "@/lib/analyzer";
 import { GitHubError, parseRepoUrl } from "@/lib/github";
 import { missingCredentials } from "@/lib/llm";
+import { allowAnalysis, MAX_ANALYSES_PER_HOUR } from "@/lib/rateLimit";
 import type { AnalysisResult } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -13,6 +14,8 @@ const CACHE_TTL_MS = 60 * 60 * 1000;
 const cache = new Map<string, { at: number; result: AnalysisResult }>();
 
 export async function POST(req: Request) {
+  // Vercel sets x-forwarded-for to the real client IP; behind other hosts it may be absent or spoofable.
+  const visitor = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown";
   let url = "";
   try {
     url = String(((await req.json()) as { url?: string }).url ?? "");
@@ -43,6 +46,11 @@ export async function POST(req: Request) {
 
         const missing = missingCredentials();
         if (missing) throw new Error(`${missing} Meanwhile, try one of the Instant Demos.`);
+
+        // Every live analysis spends the site owner's model quota. Cached results above don't count.
+        if (process.env.NODE_ENV === "production" && !allowAnalysis(visitor)) {
+          throw new Error(`You've started ${MAX_ANALYSES_PER_HOUR} analyses in the last hour. Try again later, or open one of the Instant Demos.`);
+        }
 
         const result = await analyzeRepo(url, (p) => send("progress", p), req.signal);
         cache.set(key, { at: Date.now(), result });

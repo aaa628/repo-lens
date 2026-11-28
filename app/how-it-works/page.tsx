@@ -24,7 +24,7 @@ const STAGES = [
   {
     title: "Synthesize",
     body: [
-      "The model receives the directory outline, the import graph, exported symbols, the top external packages and the selected files with line numbers. It must answer with JSON that matches a fixed schema: 5–12 modules, the links between them, up to about 8 findings, and a 5–7 step tour. Claude is the default model; OpenAI can be used instead.",
+      "The model receives the directory outline, the import graph, exported symbols, the top external packages and the selected files with line numbers. It must answer with JSON that matches a fixed schema: 5–12 modules, the links between them, up to about 8 findings, and a 5–7 step tour. Claude is the default model; OpenAI or Gemini can be used instead.",
     ],
   },
   {
@@ -90,6 +90,7 @@ export default function HowItWorks() {
             <li>Public repositories only.</li>
             <li>About 28 files are read, so a very large repo gets a partial view. The directory outline and module file counts still cover the whole tree.</li>
             <li>An analysis takes 30–120 seconds. Results are cached for an hour, so opening the same repo again is instant.</li>
+            <li>Each visitor can start 5 new analyses an hour. Cached results and the demos don't count.</li>
             <li>Without a GitHub token the server gets 60 GitHub API requests an hour, about 30 analyses.</li>
           </ul>
         </Section>
@@ -97,7 +98,7 @@ export default function HowItWorks() {
         <Section title="What leaves your browser">
           <p>
             Your browser sends the repo URL to the RepoLens server. The server downloads the files from GitHub and sends
-            the selected files to the model provider (Anthropic by default). The result is kept in server memory for up
+            the selected files to the model provider the site is set up with (Anthropic, OpenAI or Google). The result is kept in server memory for up
             to an hour; it is not written to a database. The instant demos are static files and make no model calls.
           </p>
         </Section>
