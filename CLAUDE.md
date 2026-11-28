@@ -22,7 +22,7 @@ npm run demos -- <github-url> <slug> [--analysis demos-src/<slug>.json --model "
 
 There is one small test file (`lib/core.test.ts`) and no linter. Verify changes with `npm test`, `npm run typecheck`, `npm run build`, and `npm run ingest` for pipeline changes. UI changes need a browser check (`/analyze?demo=<slug>` loads a workspace without an API key).
 
-Env (see `.env.example`): `LLM_PROVIDER` (`anthropic` default | `openai`), `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (default `claude-opus-5-5`), `ANTHROPIC_EFFORT` (default `medium`), `OPENAI_API_KEY`/`OPENAI_MODEL`, `GITHUB_TOKEN` (optional, raises the rate limit).
+Env (see `.env.example`): `LLM_PROVIDER` (`anthropic` default | `openai` | `gemini`), `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (default `claude-opus-5-5`), `ANTHROPIC_EFFORT` (default `medium`), `OPENAI_API_KEY`/`OPENAI_MODEL`, `GEMINI_API_KEY`/`GEMINI_MODEL` (default `gemini-flash-latest`), `GITHUB_TOKEN` (optional, raises the rate limit).
 
 ## Version caveats
 
@@ -38,12 +38,12 @@ Most dependencies are newer than typical training data. Check `node_modules` typ
 
 ### Analysis pipeline (server)
 
-`app/api/analyze/route.ts` is a POST endpoint that streams **SSE frames**: `event: progress` (`ProgressEvent`), then exactly one `event: result` (`AnalysisResult`) or `event: error` (`{message}`). It holds an in-memory per-instance cache keyed by `owner/repo`, and checks LLM credentials before doing any work. The client parser is `streamAnalysis` in `components/RepoLens.tsx`.
+`app/api/analyze/route.ts` is a POST endpoint that streams **SSE frames**: `event: progress` (`ProgressEvent`), then exactly one `event: result` (`AnalysisResult`) or `event: error` (`{message}`). It holds an in-memory per-instance cache keyed by `owner/repo`, checks LLM credentials before doing any work, and in production limits each visitor (first `x-forwarded-for` IP) to `MAX_ANALYSES_PER_HOUR` live analyses via `lib/rateLimit.ts` (per-instance memory; cache hits are free). The client parser is `streamAnalysis` in `components/RepoLens.tsx`.
 
 `lib/analyzer.ts#analyzeRepo` orchestrates the pipeline. Each stage is exported separately so the scripts can run parts of it:
 1. **Ingest** (`lib/github.ts`): repo meta + recursive tree; `isNoise`/`isTest` filtering; `scoreFile` heuristics; `selectFiles` does a two-pass pick (best file per "area" first, then by score) under caps: ~28 files, 150 KB total, 24 KB per file, plus per-dir/per-area/per-top-level limits. Contents come from `raw.githubusercontent.com`. Selection quality is tuned in `scoreFile`, `areaOf` and the caps; check changes with `npm run ingest` against a few repos.
 2. **Parse** (`lib/parser.ts`): regex import/export extraction for JS/TS, Python, Go, Rust, JVM and Ruby, resolved against the **full tree path set**, not just fetched files. Produces the file→file `ImportGraph`.
-3. **Synthesize** (`lib/llm/`): `index.ts` picks the provider from `LLM_PROVIDER`. The prompt is `SYSTEM_PROMPT` + `buildUserPrompt` (outline, import graph, exports, line-numbered file contents). Both providers return `LlmAnalysis`, validated by `LlmAnalysisSchema` in `lib/types.ts`. Optional fields in that schema must stay `.nullable()` (not `.optional()`) so it works with both providers' strict JSON modes. Anthropic uses a beta stream with server-side refusal fallbacks (`fallbacks: "default"`).
+3. **Synthesize** (`lib/llm/`): `index.ts` picks the provider from `LLM_PROVIDER`. The prompt is `SYSTEM_PROMPT` + `buildUserPrompt` (outline, import graph, exports, line-numbered file contents). Every provider returns `LlmAnalysis`, validated by `LlmAnalysisSchema` in `lib/types.ts`. Optional fields in that schema must stay `.nullable()` (not `.optional()`) so it works with every provider's strict JSON mode. Gemini (`gemini.ts`) uses plain `fetch` against the native `generateContent` API with `responseJsonSchema` (not the OpenAI-compatible endpoint, which has been reported to reject nullable fields). Anthropic uses a beta stream with server-side refusal fallbacks (`fallbacks: "default"`).
 4. **Ground** (`groundAnalysis`): the LLM output is not trusted as-is. It drops nonexistent paths; maps files to nodes (exact path beats longest directory prefix) to compute `fileCount`; marks edges `grounded` when the import graph supports them and adds missed import edges; drops bugs that cite files outside the tree, sets `verified` and attaches real source `context` lines; relocates `keySnippet` to the real lines (`startLine`). `LlmAnalysis` (model output) and `AnalysisResult` (grounded output the UI consumes) are deliberately different types.
 
 ### Instant demos
